@@ -1,4 +1,4 @@
-.PHONY: up down logs
+.PHONY: up down logs py-ingest minio-init
 
 up:
 	docker compose up -d --build
@@ -8,3 +8,6 @@ down:
 
 logs:
 	docker compose logs -f
+
+py-ingest:
+	docker compose exec -T streamlit python -m pipeline.cli.ingest_raw --start "$(START)" --end "$(END)"
