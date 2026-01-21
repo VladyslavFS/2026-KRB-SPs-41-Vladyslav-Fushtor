@@ -34,11 +34,7 @@ def main() -> None:
     key = ingest.run(window_start=start, window_end=end)
     print(f"Stored raw to: s3://{settings.s3_bucket}/{key}")
 
-    raw_bytes = client.fetch_geojson(
-        starttime=start.isoformat(),
-        endtime=end.isoformat(),
-        minmagnitude=settings.min_mag
-    )
+    raw_bytes = storage.get_bytes(key=key)
 
     tranform = SilverTransformJob()
     rows = tranform.run(
