@@ -1,4 +1,4 @@
-.PHONY: up down logs py-ingest minio-init
+.PHONY: up down logs py-ingest run-hour
 
 up:
 	docker compose up -d --build
@@ -11,3 +11,6 @@ logs:
 
 py-ingest:
 	docker compose exec -T streamlit python -m pipeline.cli.ingest_raw --start "$(START)" --end "$(END)"
+
+run-hour:
+	docker compose exec -T streamlit python -m pipeline.cli.run_hour --start "$(START)" --end "$(END)"
