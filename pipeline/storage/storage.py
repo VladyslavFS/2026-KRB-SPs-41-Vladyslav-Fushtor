@@ -11,3 +11,11 @@ class ObjectStorage(ABC):
     @abstractmethod
     def get_bytes(self, *, key: str) -> bytes:
         raise NotImplementedError
+    
+    @abstractmethod
+    def upload_file(self, *, local_path: str, key: str, content_type: str | None = None) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def download_file(self, *, key: str, local_path: str) -> None:
+        raise NotImplementedError

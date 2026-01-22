@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from pipeline.config.pg_settings import PostgresSettings
 from pipeline.warehouse.pg import PostgresRepository
 
 

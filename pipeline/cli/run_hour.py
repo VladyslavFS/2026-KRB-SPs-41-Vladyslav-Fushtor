@@ -7,7 +7,8 @@ from pipeline.clients.usgs_client import USGSClient
 from pipeline.config.settings import Settings
 from pipeline.config.pg_settings import PostgresSettings
 from pipeline.jobs.ingest_raw_job import RawIngestionJob
-from pipeline.jobs.transform_silver_job import SilverTransformJob
+from pipeline.jobs.write_silver_job import SilverWriteJob
+from pipeline.jobs.load_from_silver_job import LoadFromSilverJob
 from pipeline.storage.s3_storage import S3Storage
 from pipeline.warehouse.pg import PostgresRepository
 
@@ -36,17 +37,16 @@ def main() -> None:
 
     raw_bytes = storage.get_bytes(key=key)
 
-    tranform = SilverTransformJob()
-    rows = tranform.run(
+    silver_key = SilverWriteJob(storage=storage).run(
         raw_geojson=raw_bytes,
-        source_window_start=start,
-        source_window_end=end
+        window_start=start,
+        window_end=end
     )
-    print(f"Silver rows: {len(rows)}")
+    print(f"Silver parquet stored: s3://{settings.s3_bucket}/{silver_key}")
 
     repo = PostgresRepository(PostgresSettings.from_env())
-    inserted = repo.upsert_earthquakes(rows)
-    print(f"Upserted rows: {inserted}")
+    inserted = LoadFromSilverJob(storage=storage, repo=repo).run(silver_key=silver_key)
+    print(f"Upserted rows from silver layer: {inserted}")
 
 
 if __name__ == "__main__":

@@ -39,3 +39,15 @@ class S3Storage(ObjectStorage):
     def get_bytes(self, *, key: str) -> bytes:
         response = self._client.get_object(Bucket=self._bucket, Key=key)
         return response["Body"].read()
+
+    def upload_file(self, *, local_path: str, key: str, content_type: str | None = None) -> None:
+        extra_args = dict()
+        if content_type:
+            extra_args["ContentType"] = content_type
+        if extra_args:
+            self._client.upload_file(local_path, self._bucket, key, ExtraArgs=extra_args)
+        else:
+            self._client.upload_file(local_path, self._bucket, key)
+
+    def download_file(self, *, key: str, local_path: str) -> None:
+        self._client.download_file(self._bucket , key, local_path)
