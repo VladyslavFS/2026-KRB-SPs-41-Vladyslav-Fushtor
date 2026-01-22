@@ -1,4 +1,4 @@
-.PHONY: up down logs py-ingest run-hour
+.PHONY: up down logs py-ingest run-hour dq-hour
 
 up:
 	docker compose up -d --build
@@ -14,3 +14,6 @@ py-ingest:
 
 run-hour:
 	docker compose exec -T streamlit python -m pipeline.cli.run_hour --start "$(START)" --end "$(END)"
+
+dq-hour:
+	docker compose exec -T streamlit python -m pipeline.cli.dq_hour --start "$(START)" --end "$(END)"

@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-import os
+from contextlib import contextmanager
+from datetime import datetime
+from typing import Optional
+
 import psycopg2
+from psycopg2.extensions import connection as PGConnection
 from psycopg2.extras import execute_values
 
 from pipeline.config.pg_settings import PostgresSettings
-
 
 class PostgresRepository:
     def __init__(self, settings: PostgresSettings):
         self._settings = settings
 
-    def _conn(self):
+    def _conn(self) -> PGConnection:
         return psycopg2.connect(
             host=self._settings.host,
             port=self._settings.port,
@@ -21,6 +23,45 @@ class PostgresRepository:
             password=self._settings.password,
         )
     
+    @contextmanager
+    def connection(self) -> PGConnection:
+        conn = self._conn()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def query_one(self, sql: str, values: tuple = (), *, conn: Optional[PGConnection] = None) -> tuple | None:
+        if conn is None:
+            with self.connection() as c:
+                return self.query_one(sql, values, conn=c)
+
+        with conn.cursor() as cur:
+            cur.execute(sql, values)
+            return cur.fetchone()
+
+    def query_all(self, sql: str, values: tuple = (), *, conn: Optional[PGConnection] = None) -> list[tuple]:
+        if conn is None:
+            with self.connection() as c:
+                return self.query_all(sql, values, conn=c)
+
+        with conn.cursor() as cur:
+            cur.execute(sql, values)
+            return cur.fetchall()
+
+    def execute(self, sql: str, values: tuple = (), *, conn: Optional[PGConnection] = None) -> None:
+        if conn is None:
+            with self.connection() as c:
+                self.execute(sql, values, conn=c)
+                return
+
+        with conn.cursor() as cur:
+            cur.execute(sql, values)
+
     def upsert_earthquakes(self, rows: list[dict]) -> int:
         """
         UPSERT into ods.fct_earthquake_event.
@@ -66,8 +107,46 @@ class PostgresRepository:
         WHERE ods.fct_earthquake_event.updated < EXCLUDED.updated;
         """
 
-        with self._conn() as conn:
+        with self.connection() as conn:
             with conn.cursor() as cursor:
                 execute_values(cursor, sql, values, page_size=2000)
         
         return len(rows)
+    
+    def create_dq_run(
+            self,
+            *,
+            window_start: datetime,
+            window_end: datetime,
+            status: str,
+            total_rows: int,
+            issues_count: int,
+            conn: Optional[PGConnection] = None
+        ) -> int:
+        row = self.query_one(
+            """
+            INSERT INTO ods.dq_run (window_start, window_end, status, total_rows, issues_count)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING run_id;
+            """,
+            (window_start, window_end, status, total_rows, issues_count),
+            conn=conn
+        )
+        if row is None:
+            raise RuntimeError("Failed to create dq_run (no run_id returned)")
+        return int(row[0])
+    
+    def insert_dq_issues(self, *, run_id: int, issues: list[dict], conn: Optional[PGConnection] = None) -> None:
+        if not issues:
+            return
+        cols = ["run_id", "issue_type", "severity", "message", "sample_ids"]
+        values = [[run_id, i["issue_type"], i["severity"], i["message"], i.get("sample_ids")] for i in issues]
+        sql = f"INSERT INTO ods.dq_issue ({', '.join(cols)}) VALUES %s"
+
+        if conn is None:
+            with self.connection() as c:
+                self.insert_dq_issues(run_id=run_id, issues=issues, conn=c)
+                return
+
+        with conn.cursor() as cur:
+            execute_values(cur, sql, values, page_size=1000)
