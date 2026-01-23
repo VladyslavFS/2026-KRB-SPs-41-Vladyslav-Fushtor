@@ -2,7 +2,9 @@ import os
 import pandas as pd
 import psycopg2
 import streamlit as st
-
+import folium
+from folium.plugins import MarkerCluster
+from streamlit_folium import st_folium
 
 st.set_page_config(page_title="Earthquake Platform", layout="wide")
 st.title("Earthquake Platform (Dev)")
@@ -33,7 +35,7 @@ with st.sidebar:
     st.header("Filters")
     lookback_hours = st.slider("Lookback (hours)", min_value=1, max_value=168, value=24)
 
-    min_mag = st.number_input("Min magnitude", min_value=0.0, max_value=10.0, value=2.5, step=0.1)
+    min_mag = st.number_input("Min magnitude", min_value=0.0, max_value=10.0, value=0.0, step=0.1)
 
     severity = st.selectbox("Severity", ["ALL", "LOW", "MEDIUM", "HIGH", "UNKNOWN"], index=0)
 
@@ -104,7 +106,10 @@ def render_feed(conn):
     with col1:
         kpi_card("Rows", str(len(df)))
     with col2:
-        kpi_card("Max magnitude", f"{df['mag'].max():.2f}" if not df.empty and df["mag"].notna().any() else "—")
+        kpi_card(
+            "Max magnitude",
+            f"{df['mag'].max():.2f}" if not df.empty and df["mag"].notna().any() else "—",
+        )
     with col3:
         tsunami_cnt = int((df["tsunami"] == 1).sum()) if not df.empty and "tsunami" in df.columns else 0
         kpi_card("Tsunami flagged", str(tsunami_cnt))
@@ -112,15 +117,84 @@ def render_feed(conn):
         high_cnt = int((df["severity"] == "HIGH").sum()) if not df.empty and "severity" in df.columns else 0
         kpi_card("HIGH severity", str(high_cnt))
 
-    # Map (simple)
-    st.subheader("Map (last events)")
+    # Interactive map (Folium)
+    st.subheader("Interactive map")
+
     df_geo = df.dropna(subset=["latitude", "longitude"]).copy()
     if df_geo.empty:
         st.info("No points with valid latitude/longitude for the selected filters.")
     else:
-        df_map = df_geo.rename(columns={"latitude": "lat", "longitude": "lon"})[["lat", "lon"]]
-        st.map(df_map)
+        # Ensure numeric types
+        df_geo["latitude"] = pd.to_numeric(df_geo["latitude"], errors="coerce")
+        df_geo["longitude"] = pd.to_numeric(df_geo["longitude"], errors="coerce")
+        df_geo = df_geo.dropna(subset=["latitude", "longitude"])
 
+        if df_geo.empty:
+            st.info("No points with valid latitude/longitude for the selected filters.")
+        else:
+            center_lat = float(df_geo["latitude"].mean())
+            center_lon = float(df_geo["longitude"].mean())
+
+            m = folium.Map(location=[center_lat, center_lon], zoom_start=2)
+            cluster = MarkerCluster().add_to(m)
+
+            for _, r in df_geo.iterrows():
+                place = r.get("place") or "Unknown place"
+                mag = r.get("mag")
+                depth = r.get("depth")
+                lat = r.get("latitude")
+                lon = r.get("longitude")
+                t = r.get("time")
+                url = r.get("url")
+
+                # Format time nicely (works for datetime, pandas Timestamp, str)
+                try:
+                    if pd.isna(t):
+                        t_s = "—"
+                    elif hasattr(t, "to_pydatetime"):
+                        t_s = t.to_pydatetime().strftime("%Y-%m-%d %H:%M:%S")
+                    elif hasattr(t, "strftime"):
+                        t_s = t.strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        t_s = str(t)
+                except Exception:
+                    t_s = str(t)
+
+                # Safe numeric formatting
+                try:
+                    lat_f = float(lat)
+                    lon_f = float(lon)
+                    coords_s = f"{lat_f:.5f}, {lon_f:.5f}"
+                except Exception:
+                    lat_f = float(lat) if lat is not None else None
+                    lon_f = float(lon) if lon is not None else None
+                    coords_s = f"{lat}, {lon}"
+
+                mag_s = "—" if mag is None or (isinstance(mag, float) and pd.isna(mag)) else mag
+                depth_s = "—" if depth is None or (isinstance(depth, float) and pd.isna(depth)) else depth
+
+                popup_html = f"""
+                <div style="width:260px">
+                  <b>{place}</b><br/>
+                  <b>Magnitude:</b> {mag_s}<br/>
+                  <b>Depth:</b> {depth_s} km<br/>
+                  <b>Coordinates:</b> {coords_s}<br/>
+                  <b>Time (UTC):</b> {t_s}<br/>
+                  {"<a href='" + str(url) + "' target='_blank'>USGS link</a>" if url else ""}
+                </div>
+                """
+
+                tooltip = f"{place} | M {mag}" if mag is not None and not (isinstance(mag, float) and pd.isna(mag)) else place
+
+                folium.Marker(
+                    location=[float(lat_f), float(lon_f)],
+                    popup=folium.Popup(popup_html, max_width=300),
+                    tooltip=tooltip,
+                ).add_to(cluster)
+
+            st_folium(m, width=1200, height=600)
+
+    # Table
     st.subheader("Table")
     st.dataframe(
         df,

@@ -29,8 +29,7 @@ class RawIngestionJob:
 
         raw_bytes = self.client.fetch_geojson(
             starttime=start_s,
-            endtime=end_s,
-            minmagnitude=self.settings.min_mag,
+            endtime=end_s
         )
 
         key = (

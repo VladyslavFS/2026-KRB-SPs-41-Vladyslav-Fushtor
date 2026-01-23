@@ -1,4 +1,4 @@
-.PHONY: up down logs py-ingest run-hour dq-hour bi-marts
+.PHONY: up down logs py-ingest run-hour dq-hour bi-marts backfill-hours
 
 up:
 	docker compose up -d --build
@@ -20,3 +20,6 @@ dq-hour:
 
 bi-marts:
 	docker compose exec -T streamlit python -m pipeline.cli.build_bi_marts --days "$(DAYS)"
+
+backfill-hours:
+	docker compose exec -T streamlit python -m pipeline.cli.backfill_hours --start "$(START)" --end "$(END)"
