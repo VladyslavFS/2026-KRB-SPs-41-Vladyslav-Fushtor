@@ -4,7 +4,7 @@ import argparse
 from dateutil import parser as dtparser
 
 from pipeline.config.pg_settings import PostgresSettings
-from pipeline.quality.dq_job import DataQualityJob
+from pipeline.jobs.dq_job import DataQualityJob
 from pipeline.warehouse.pg import PostgresRepository
 
 

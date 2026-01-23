@@ -24,7 +24,7 @@ class PostgresRepository:
         )
     
     @contextmanager
-    def connection(self) -> PGConnection:
+    def connection(self):
         conn = self._conn()
         try:
             yield conn
@@ -125,7 +125,7 @@ class PostgresRepository:
         ) -> int:
         row = self.query_one(
             """
-            INSERT INTO ods.dq_run (window_start, window_end, status, total_rows, issues_count)
+            INSERT INTO dq.dq_run (window_start, window_end, status, total_rows, issues_count)
             VALUES (%s, %s, %s, %s, %s)
             RETURNING run_id;
             """,
@@ -141,11 +141,34 @@ class PostgresRepository:
             return
         cols = ["run_id", "issue_type", "severity", "message", "sample_ids"]
         values = [[run_id, i["issue_type"], i["severity"], i["message"], i.get("sample_ids")] for i in issues]
-        sql = f"INSERT INTO ods.dq_issue ({', '.join(cols)}) VALUES %s"
+        sql = f"INSERT INTO dq.dq_issue ({', '.join(cols)}) VALUES %s"
 
         if conn is None:
             with self.connection() as c:
                 self.insert_dq_issues(run_id=run_id, issues=issues, conn=c)
+                return
+
+        with conn.cursor() as cur:
+            execute_values(cur, sql, values, page_size=1000)
+
+    def insert_dq_metrics(self, *, run_id: int, metrics: dict[str, float], conn=None) -> None:
+        if not metrics:
+            return
+
+        cols = ["run_id", "metric_name", "metric_value"]
+        values = [[run_id, k, float(v)] for k, v in metrics.items()]
+
+        sql = f"""
+        INSERT INTO dq.dq_metric ({", ".join(cols)})
+        VALUES %s
+        ON CONFLICT (run_id, metric_name) DO UPDATE
+        SET metric_value = EXCLUDED.metric_value,
+            created_at = now();
+        """
+
+        if conn is None:
+            with self.connection() as c:
+                self.insert_dq_metrics(run_id=run_id, metrics=metrics, conn=c)
                 return
 
         with conn.cursor() as cur:

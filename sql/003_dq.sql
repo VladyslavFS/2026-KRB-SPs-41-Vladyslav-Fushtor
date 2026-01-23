@@ -1,4 +1,6 @@
-CREATE TABLE IF NOT EXISTS ods.dq_run (
+CREATE SCHEMA IF NOT EXISTS dq;
+
+CREATE TABLE IF NOT EXISTS dq.dq_run (
   run_id BIGSERIAL PRIMARY KEY,
   run_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   window_start TIMESTAMPTZ NOT NULL,
@@ -8,9 +10,9 @@ CREATE TABLE IF NOT EXISTS ods.dq_run (
   issues_count INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS ods.dq_issue (
+CREATE TABLE IF NOT EXISTS dq.dq_issue (
   issue_id BIGSERIAL PRIMARY KEY,
-  run_id BIGINT NOT NULL REFERENCES ods.dq_run(run_id) ON DELETE CASCADE,
+  run_id BIGINT NOT NULL REFERENCES dq.dq_run(run_id) ON DELETE CASCADE,
   issue_type TEXT NOT NULL,
   severity TEXT NOT NULL, -- WARN/ERROR
   message TEXT NOT NULL,
@@ -18,4 +20,18 @@ CREATE TABLE IF NOT EXISTS ods.dq_issue (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS ix_dq_issue_run_id ON ods.dq_issue(run_id);
+CREATE TABLE IF NOT EXISTS dq.dq_metric (
+  metric_id BIGSERIAL PRIMARY KEY,
+  run_id BIGINT NOT NULL REFERENCES dq.dq_run(run_id) ON DELETE CASCADE,
+
+  metric_name TEXT NOT NULL,
+  metric_value DOUBLE PRECISION NOT NULL,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE(run_id, metric_name)
+);
+
+CREATE INDEX IF NOT EXISTS ix_dq_metric_run_id ON dq.dq_metric(run_id);
+CREATE INDEX IF NOT EXISTS ix_dq_metric_name ON dq.dq_metric(metric_name);
+CREATE INDEX IF NOT EXISTS ix_dq_issue_run_id ON dq.dq_issue(run_id);
