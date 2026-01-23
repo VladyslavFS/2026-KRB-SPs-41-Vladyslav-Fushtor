@@ -185,6 +185,14 @@ def render_feed(conn):
                 """
 
                 tooltip = f"{place} | M {mag}" if mag is not None and not (isinstance(mag, float) and pd.isna(mag)) else place
+                
+                if lat is None or lon is None:
+                    continue
+                try:
+                    lat_f = float(lat)
+                    lon_f = float(lon)
+                except Exception:
+                    continue
 
                 folium.Marker(
                     location=[float(lat_f), float(lon_f)],
