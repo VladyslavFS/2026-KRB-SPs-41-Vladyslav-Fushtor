@@ -1,4 +1,4 @@
-.PHONY: up down logs py-ingest run-hour dq-hour bi-marts backfill-hours export-bi-parquet
+.PHONY: up down logs py-ingest run-hour dq-hour bi-marts backfill-hours export-bi-parquet pipeline backfill
 
 up:
 	docker compose up -d --build
@@ -26,3 +26,9 @@ backfill-hours:
 
 export-bi-parquet:
 	docker compose exec -T streamlit python -m pipeline.cli.export_bi_parquet --days "$(DAYS)"
+
+pipeline:
+	docker compose exec -T streamlit python -m pipeline.cli.run_pipeline_hour --start "$(START)" --end "$(END)" --export-days "$(DAYS)"
+
+backfill:
+	docker compose exec -T streamlit python -m pipeline.cli.backfill_pipeline_hours --start "$(START)" --end "$(END)" --export-days "$(DAYS)"
