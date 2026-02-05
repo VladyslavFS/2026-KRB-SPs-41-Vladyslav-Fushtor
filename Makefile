@@ -1,4 +1,4 @@
-.PHONY: up down logs py-ingest run-hour dq-hour bi-marts backfill-hours export-bi-parquet pipeline backfill
+.PHONY: up down logs py-ingest run-hour dq-hour bi-marts backfill-hours export-bi-parquet pipeline backfill db-migrate gold-layer
 
 up:
 	docker compose up -d --build
@@ -23,6 +23,9 @@ bi-marts:
 
 backfill-hours:
 	docker compose exec -T streamlit python -m pipeline.cli.backfill_hours --start "$(START)" --end "$(END)"
+
+gold-layer:
+	docker compose exec -T streamlit python -m pipeline.cli.build_gold_layer --days "$(DAYS)"
 
 export-bi-parquet:
 	docker compose exec -T streamlit python -m pipeline.cli.export_bi_parquet --days "$(DAYS)"
