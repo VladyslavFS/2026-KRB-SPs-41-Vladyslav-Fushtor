@@ -21,6 +21,13 @@ CREATE TABLE IF NOT EXISTS ods.fct_earthquake_event (
   url TEXT,
   detail TEXT,
   tsunami INTEGER,
+  alert TEXT,
+  sig INTEGER,
+  felt INTEGER,
+  mmi DOUBLE PRECISION,
+  nst INTEGER,
+  gap DOUBLE PRECISION,
+  mag_error DOUBLE PRECISION,
 
   source_window_start TIMESTAMPTZ NOT NULL,
   source_window_end   TIMESTAMPTZ NOT NULL,

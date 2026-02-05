@@ -10,6 +10,7 @@ from psycopg2.extras import execute_values
 
 from pipeline.config.pg_settings import PostgresSettings
 
+
 class PostgresRepository:
     def __init__(self, settings: PostgresSettings):
         self._settings = settings
@@ -78,6 +79,7 @@ class PostgresRepository:
             "mag", "mag_type",
             "place", "event_type", "status", "net",
             "url", "detail", "tsunami",
+            "alert", "sig", "felt", "mmi", "nst", "gap", "mag_error",
             "source_window_start", "source_window_end",
         ]
 
@@ -101,6 +103,15 @@ class PostgresRepository:
           url = EXCLUDED.url,
           detail = EXCLUDED.detail,
           tsunami = EXCLUDED.tsunami,
+          
+          alert = EXCLUDED.alert,
+          sig = EXCLUDED.sig,
+          felt = EXCLUDED.felt,
+          mmi = EXCLUDED.mmi,
+          nst = EXCLUDED.nst,
+          gap = EXCLUDED.gap,
+          mag_error = EXCLUDED.mag_error,
+
           source_window_start = EXCLUDED.source_window_start,
           source_window_end = EXCLUDED.source_window_end,
           ingested_at = now()
