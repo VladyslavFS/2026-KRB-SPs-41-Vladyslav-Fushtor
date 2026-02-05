@@ -70,11 +70,30 @@ class SilverWriteJob:
                 "url": props.get("url"),
                 "detail": props.get("detail"),
                 "tsunami": props.get("tsunami"),
+                # Extended stats
+                "alert": props.get("alert"),  # green, yellow, orange, red
+                "sig": int(props.get("sig")) if props.get("sig") is not None else None,
+                "felt": int(props.get("felt")) if props.get("felt") is not None else None,
+                "mmi": float(props.get("mmi")) if props.get("mmi") is not None else None,
+                "nst": int(props.get("nst")) if props.get("nst") is not None else None, # Number of stations
+                "gap": float(props.get("gap")) if props.get("gap") is not None else None, # Azimuthal gap
+                "mag_error": float(props.get("magError")) if props.get("magError") is not None else None,
+                # Window
                 "source_window_start": window_start,
                 "source_window_end": window_end,
             }
             rows.append(row)
-        df = pd.DataFrame(rows)
+        
+        # Handle empty case to preserve schema if possible, or just create empty df
+        if not rows:
+             df = pd.DataFrame(columns=[
+                 "id", "time", "updated", "latitude", "longitude", "depth", "mag", "mag_type",
+                 "place", "event_type", "status", "net", "url", "detail", "tsunami",
+                 "alert", "sig", "felt", "mmi", "nst", "gap", "mag_error",
+                 "source_window_start", "source_window_end"
+             ])
+        else:
+            df = pd.DataFrame(rows)
 
         conn = duckdb.connect()
         conn.register("rows", df)
