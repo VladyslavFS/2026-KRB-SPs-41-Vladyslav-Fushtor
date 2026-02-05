@@ -19,3 +19,7 @@ class ObjectStorage(ABC):
     @abstractmethod
     def download_file(self, *, key: str, local_path: str) -> None:
         raise NotImplementedError
+    
+    @abstractmethod
+    def list_keys(self, *, prefix: str) -> list[str]:
+        raise NotImplementedError

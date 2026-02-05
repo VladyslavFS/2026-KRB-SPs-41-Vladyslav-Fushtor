@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional
 
+import pandas as pd
 import psycopg2
 from psycopg2.extensions import connection as PGConnection
 from psycopg2.extras import execute_values
@@ -182,5 +183,25 @@ class PostgresRepository:
                 self.insert_dq_metrics(run_id=run_id, metrics=metrics, conn=c)
                 return
 
+        with conn.cursor() as cur:
+            execute_values(cur, sql, values, page_size=1000)
+
+
+    def insert_df(self, *, conn, table: str, df: pd.DataFrame) -> None:
+        """
+        Generic bulk insert for pandas DataFrame.
+        Columns in DF must match columns in Table.
+        """
+        if df.empty:
+            return
+        
+        df_obj = df.astype(object)
+        df_clean = df_obj.where(pd.notnull(df_obj), None)
+        
+        columns = list(df_clean.columns)
+        values = [tuple(x) for x in df_clean.to_numpy()]
+        
+        sql = f"INSERT INTO {table} ({', '.join(columns)}) VALUES %s"
+        
         with conn.cursor() as cur:
             execute_values(cur, sql, values, page_size=1000)

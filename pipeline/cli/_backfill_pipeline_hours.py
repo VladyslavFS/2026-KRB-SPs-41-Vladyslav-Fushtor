@@ -8,7 +8,7 @@ from dateutil import parser as dtparser
 from pipeline.cli.run_pipeline_hour import main as run_pipeline_hour_main
 from pipeline.config.pg_settings import PostgresSettings
 from pipeline.config.settings import Settings
-from pipeline.jobs.build_bi_marts_job import BuildBIMartsJob
+from pipeline.jobs.load_bi_to_serving_layer_job import BuildBIMartsJob
 from pipeline.jobs.export_bi_to_parquet_job import ExportBIToParquetJob
 from pipeline.storage.s3_storage import S3Storage
 from pipeline.warehouse.pg import PostgresRepository

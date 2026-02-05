@@ -51,3 +51,12 @@ class S3Storage(ObjectStorage):
 
     def download_file(self, *, key: str, local_path: str) -> None:
         self._client.download_file(self._bucket , key, local_path)
+
+    def list_keys(self, *, prefix: str) -> list[str]:
+        paginator = self._client.get_paginator("list_objects_v2")
+        keys = []
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+            if "Contents" in page:
+                for obj in page["Contents"]:
+                    keys.append(obj["Key"])
+        return keys

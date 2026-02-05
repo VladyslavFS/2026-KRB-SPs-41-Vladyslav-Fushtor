@@ -19,7 +19,7 @@ dq-hour:
 	docker compose exec -T streamlit python -m pipeline.cli.dq_hour --start "$(START)" --end "$(END)"
 
 bi-marts:
-	docker compose exec -T streamlit python -m pipeline.cli.build_bi_marts --days "$(DAYS)"
+	docker compose exec -T streamlit python -m pipeline.cli.load_bi_store --days "$(START)"
 
 backfill-hours:
 	docker compose exec -T streamlit python -m pipeline.cli.backfill_hours --start "$(START)" --end "$(END)"
