@@ -88,7 +88,7 @@ class LoadFromSilverJob:
                 "detail": safe_str(r["detail"]),
                 "tsunami": safe_int(r["tsunami"]),
                 "country": safe_str(r.get("country")),
-                # New fields (handling pd.NA safely)
+                "risk_class": safe_str(r.get("risk_class")),
                 "alert": safe_str(r["alert"]),
                 "sig": safe_int(r["sig"]),
                 "felt": safe_int(r["felt"]),

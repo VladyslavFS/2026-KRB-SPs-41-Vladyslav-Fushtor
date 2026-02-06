@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS ods.fct_earthquake_event (
 
   place TEXT,
   country VARCHAR(5),
+  risk_class VARCHAR(10),
   event_type TEXT,
   status TEXT,
   net TEXT,

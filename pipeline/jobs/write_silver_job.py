@@ -10,6 +10,7 @@ import duckdb
 import pandas as pd
 
 from pipeline.enrich.geo import get_country_code
+from pipeline.enrich.risk import calculate_risk_class
 from pipeline.storage.storage import ObjectStorage
 
 
@@ -47,9 +48,16 @@ class SilverWriteJob:
             lat = coords[1] if len(coords) > 1 else None
             depth = coords[2] if len(coords) > 2 else None
 
+
             country = None
             if lat is not None and lon is not None:
                 country = get_country_code(float(lat), float(lon))
+
+            mag = props.get("mag")
+            risk_class = calculate_risk_class(
+                mag=float(mag) if mag is not None else None,
+                depth=float(depth) if depth is not None else None
+            )
 
             time_ms = props.get("time")
             updated_ms = props.get("updated")
@@ -76,6 +84,7 @@ class SilverWriteJob:
                 "detail": props.get("detail"),
                 "tsunami": props.get("tsunami"),
                 "country": country,
+                "risk_class": risk_class,
                 # Extended stats
                 "alert": props.get("alert"),  # green, yellow, orange, red
                 "sig": int(props.get("sig")) if props.get("sig") is not None else None,
@@ -95,7 +104,7 @@ class SilverWriteJob:
              df = pd.DataFrame(columns=[
                  "id", "time", "updated", "latitude", "longitude", "depth", "mag", "mag_type",
                  "place", "event_type", "status", "net", "url", "detail", "tsunami", "country",
-                 "alert", "sig", "felt", "mmi", "nst", "gap", "mag_error",
+                 "risk_class", "alert", "sig", "felt", "mmi", "nst", "gap", "mag_error",
                  "source_window_start", "source_window_end"
              ])
         else:
