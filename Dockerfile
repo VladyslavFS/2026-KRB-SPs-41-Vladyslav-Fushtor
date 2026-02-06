@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY pipeline /app/pipeline
 COPY ui /app/ui
+COPY api /app/api
 COPY pyproject.toml /app/pyproject.toml
 RUN pip install --no-cache-dir -e .
 

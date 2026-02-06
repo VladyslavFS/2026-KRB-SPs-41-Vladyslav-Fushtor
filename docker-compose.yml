@@ -23,6 +23,26 @@ services:
       - postgres_dwh_data:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./:/app
+    depends_on:
+      - postgres_dwh
+      - redis
+
   streamlit:
     build: .
     working_dir: /app

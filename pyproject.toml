@@ -18,6 +18,9 @@ dependencies = [
   "reverse_geocoder>=1.5.1",
   "dagster>=1.6.0",
   "dagster-webserver>=1.6.0",
+  "fastapi>=0.109.0",
+  "uvicorn>=0.27.0",
+  "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]
