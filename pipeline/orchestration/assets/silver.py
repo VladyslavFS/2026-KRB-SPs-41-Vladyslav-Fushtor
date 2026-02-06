@@ -9,7 +9,7 @@ from pipeline.orchestration.assets.ingestion import hourly_partitions
 @asset(
     partitions_def=hourly_partitions,
     key_prefix=["silver", "earthquake"],
-    group_name="processing",
+    group_name="silver",
     description="Parses GeoJSON and saves enriched Parquet to Silver layer.",
     ins={"raw_key": AssetIn(key=["raw", "earthquake", "raw_geojson"])}
 )

@@ -4,7 +4,7 @@ import argparse
 
 from pipeline.config.pg_settings import PostgresSettings
 from pipeline.config.settings import Settings
-from pipeline.jobs.build_gold_bi_parquet_job import BuildGoldBIPartitionsJob
+from pipeline.jobs.build_gold_job import BuildGoldJob
 from pipeline.storage.s3_storage import S3Storage
 from pipeline.warehouse.pg import PostgresRepository
 
@@ -18,7 +18,7 @@ def main() -> None:
     storage = S3Storage(settings)
     repo = PostgresRepository(PostgresSettings.from_env())
 
-    job = BuildGoldBIPartitionsJob(repo=repo, storage=storage, bucket=settings.s3_bucket)
+    job = BuildGoldJob(repo=repo, storage=storage, bucket=settings.s3_bucket)
     counts = job.run(days=int(args.days))
 
     print("✓ Gold layer built successfully:")

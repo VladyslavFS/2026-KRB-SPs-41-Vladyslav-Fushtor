@@ -20,7 +20,7 @@ def _daterange(start: date, end_exclusive: date) -> Iterable[date]:
 
 
 @dataclass(frozen=True)
-class BuildGoldBIPartitionsJob:
+class BuildGoldJob:
     """
     Reads ODS (Postgres), computes BI marts in memory (Pandas),
     and writes Gold Parquet to S3.

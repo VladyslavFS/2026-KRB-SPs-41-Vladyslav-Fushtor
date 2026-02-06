@@ -12,7 +12,7 @@ hourly_partitions = HourlyPartitionsDefinition(start_date="2026-01-01-00:00")
 @asset(
     partitions_def=hourly_partitions,
     key_prefix=["raw", "earthquake"],
-    group_name="ingestion",
+    group_name="bronze",
     description="Downloads raw GeoJSON from USGS API for a specific hour."
 )
 def raw_geojson(context: AssetExecutionContext):
