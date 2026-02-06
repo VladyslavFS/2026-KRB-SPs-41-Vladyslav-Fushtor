@@ -26,12 +26,12 @@ def gold_events(context: AssetExecutionContext, ods_trigger: int):
     repo = PostgresRepository(pg_settings)
     
     job = BuildGoldJob(repo=repo, storage=storage, bucket=settings.s3_bucket)
-    result_keys = job.run(days=days_to_process)
+    results = job.run(days=days_to_process)
     
     return Output(
-        value=result_keys, # Список створених файлів
+        value=results,
         metadata={
-            "files_generated": len(result_keys),
+            "stats": str(results),
             "days_processed": days_to_process
         }
     )
@@ -43,7 +43,7 @@ def gold_events(context: AssetExecutionContext, ods_trigger: int):
     description="Syncs Gold S3 data to Postgres BI tables.",
     ins={"gold_files": AssetIn(key=["gold", "earthquake", "gold_events"])}
 )
-def bi_tables(context: AssetExecutionContext, gold_files: list):
+def bi_tables(context: AssetExecutionContext, gold_files: dict):
     days_to_sync = 30
     
     settings = Settings.from_env()
@@ -58,6 +58,6 @@ def bi_tables(context: AssetExecutionContext, gold_files: list):
         value="Synced",
         metadata={
             "status": "Success",
-            "source_gold_files": len(gold_files)
+            "total_rows_synced": sum(gold_files.values()) if gold_files else 0
         }
     )

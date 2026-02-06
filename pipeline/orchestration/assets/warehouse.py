@@ -25,10 +25,8 @@ def ods_events(context: AssetExecutionContext, silver_key: str):
     pg_settings = PostgresSettings.from_env()
     repo = PostgresRepository(pg_settings)
     
-    silver_bytes = storage.get_bytes(key=silver_key)
-    
     job = LoadFromSilverJob(repo=repo, storage=storage)
-    count = job.run(silver_parquet=silver_bytes)
+    count = job.run(silver_key=silver_key)
     
     return Output(
         value=count,
