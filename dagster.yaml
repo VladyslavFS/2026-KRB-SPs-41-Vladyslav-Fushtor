@@ -1,0 +1,11 @@
+storage:
+  sqlite:
+    base_dir: /opt/dagster/dagster_home/storage
+
+compute_logs:
+  local:
+    base_dir: /opt/dagster/dagster_home/compute_logs
+
+local_artifact_storage:
+  local_artifact_storage:
+    base_dir: /opt/dagster/dagster_home/artifacts
