@@ -1,5 +1,4 @@
 from dagster import asset, Output, AssetExecutionContext, AssetIn
-from datetime import datetime, timedelta, timezone
 
 from pipeline.config.pg_settings import PostgresSettings
 from pipeline.config.settings import Settings
@@ -16,10 +15,6 @@ from pipeline.orchestration.assets.ingestion import hourly_partitions
     ins={"silver_key": AssetIn(key=["silver", "earthquake", "silver_events"])}
 )
 def ods_events(context: AssetExecutionContext, silver_key: str):
-    partition_date_str = context.partition_key
-    window_start = datetime.strptime(partition_date_str, "%Y-%m-%d-%H:%M").replace(tzinfo=timezone.utc)
-    window_end = window_start + timedelta(hours=1)
-
     settings = Settings.from_env()
     storage = S3Storage(settings)
     pg_settings = PostgresSettings.from_env()

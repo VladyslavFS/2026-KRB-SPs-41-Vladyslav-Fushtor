@@ -23,16 +23,15 @@ def dq_report(context: AssetExecutionContext, ods_trigger: int):
 
     job = DataQualityJob(repo=repo)
     
-    result = job.run(window_start=window_start, window_end=window_end)
+    issues_count = job.run(window_start=window_start, window_end=window_end)
     
-    status = result.get("status", "UNKNOWN")
-    issues = result.get("issues_count", 0)
+    status = "SUCCESS" if issues_count == 0 else "WARNING"
     
     return Output(
-        value=result,
+        value=issues_count,
         metadata={
             "dq_status": status,
-            "issues_found": issues,
+            "issues_found": issues_count,
             "report_table": "dq.dq_run"
         }
     )
