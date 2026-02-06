@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import duckdb
 import pandas as pd
 
+from pipeline.enrich.geo import get_country_code
 from pipeline.storage.storage import ObjectStorage
 
 
@@ -46,6 +47,10 @@ class SilverWriteJob:
             lat = coords[1] if len(coords) > 1 else None
             depth = coords[2] if len(coords) > 2 else None
 
+            country = None
+            if lat is not None and lon is not None:
+                country = get_country_code(float(lat), float(lon))
+
             time_ms = props.get("time")
             updated_ms = props.get("updated")
             if time_ms is None or updated_ms is None:
@@ -70,6 +75,7 @@ class SilverWriteJob:
                 "url": props.get("url"),
                 "detail": props.get("detail"),
                 "tsunami": props.get("tsunami"),
+                "country": country,
                 # Extended stats
                 "alert": props.get("alert"),  # green, yellow, orange, red
                 "sig": int(props.get("sig")) if props.get("sig") is not None else None,
@@ -88,7 +94,7 @@ class SilverWriteJob:
         if not rows:
              df = pd.DataFrame(columns=[
                  "id", "time", "updated", "latitude", "longitude", "depth", "mag", "mag_type",
-                 "place", "event_type", "status", "net", "url", "detail", "tsunami",
+                 "place", "event_type", "status", "net", "url", "detail", "tsunami", "country",
                  "alert", "sig", "felt", "mmi", "nst", "gap", "mag_error",
                  "source_window_start", "source_window_end"
              ])

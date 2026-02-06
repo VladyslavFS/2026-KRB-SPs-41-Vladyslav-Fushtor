@@ -87,6 +87,7 @@ class LoadFromSilverJob:
                 "url": safe_str(r["url"]),
                 "detail": safe_str(r["detail"]),
                 "tsunami": safe_int(r["tsunami"]),
+                "country": safe_str(r.get("country")),
                 # New fields (handling pd.NA safely)
                 "alert": safe_str(r["alert"]),
                 "sig": safe_int(r["sig"]),

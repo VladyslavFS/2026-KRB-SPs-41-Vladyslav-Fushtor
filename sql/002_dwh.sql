@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS ods.fct_earthquake_event (
   mag_type TEXT,
 
   place TEXT,
+  country VARCHAR(5),
   event_type TEXT,
   status TEXT,
   net TEXT,
@@ -35,5 +36,3 @@ CREATE TABLE IF NOT EXISTS ods.fct_earthquake_event (
 );
 
 CREATE INDEX IF NOT EXISTS ix_earthquake_time ON ods.fct_earthquake_event (time);
-CREATE INDEX IF NOT EXISTS ix_earthquake_mag  ON ods.fct_earthquake_event (mag);
-CREATE INDEX IF NOT EXISTS ix_earthquake_updated ON ods.fct_earthquake_event (updated);

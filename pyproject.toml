@@ -15,6 +15,7 @@ dependencies = [
   "pyarrow>=15.0.0",
   "folium>=0.16.0",
   "streamlit-folium>=0.18.0",
+  "reverse_geocoder>=1.5.1",
 ]
 
 [project.optional-dependencies]

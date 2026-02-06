@@ -78,8 +78,8 @@ class PostgresRepository:
             "time", "updated",
             "latitude", "longitude", "depth",
             "mag", "mag_type",
-            "place", "event_type", "status", "net",
-            "url", "detail", "tsunami",
+            "place", "country", "event_type", "status", "net",
+            "url", "detail", "tsunami", 
             "alert", "sig", "felt", "mmi", "nst", "gap", "mag_error",
             "source_window_start", "source_window_end",
         ]
@@ -98,6 +98,7 @@ class PostgresRepository:
           mag = EXCLUDED.mag,
           mag_type = EXCLUDED.mag_type,
           place = EXCLUDED.place,
+          country = EXCLUDED.country,
           event_type = EXCLUDED.event_type,
           status = EXCLUDED.status,
           net = EXCLUDED.net,
