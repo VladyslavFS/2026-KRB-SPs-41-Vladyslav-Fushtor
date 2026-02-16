@@ -27,6 +27,14 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   api:
     build: .
@@ -37,11 +45,20 @@ services:
       - .env
     environment:
       REDIS_URL: redis://redis:6379/0
+      DWH_HOST: postgres_dwh
+      CORS_ORIGINS: http://localhost:8501,http://localhost:3000
     volumes:
       - ./:/app
     depends_on:
-      - postgres_dwh
-      - redis
+      postgres_dwh:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   streamlit:
     build: .
@@ -75,4 +92,5 @@ services:
 volumes:
   minio_data:
   postgres_dwh_data:
+  redis_data:
   dagster_data:

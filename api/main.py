@@ -1,55 +1,111 @@
-from contextlib import asynccontextmanager
-import os
-import redis.asyncio as redis
-from fastapi import FastAPI
-import psycopg2
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+import logging
 
-redis_client = None
+from api.config import Settings
+from api.routers import health
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    global redis_client
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    redis_client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
-    print(f"✅ Connected to Redis at {redis_url}")
-    yield
-    # Shutdown
-    await redis_client.close()
-    print("🛑 Redis connection closed")
+# Logging setup
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Earthquake API", lifespan=lifespan)
+# Initialize settings
+settings = Settings.from_env()
 
-@app.get("/")
-async def root():
-    return {"message": "Earthquake Platform API v1"}
+# FastAPI app
+app = FastAPI(
+    title="Earthquake Platform API",
+    description="Real-time earthquake monitoring and alerting system",
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
+)
 
-@app.get("/health")
-async def health():
-    checks = {
-        "postgres": "UNKNOWN",
-        "redis": "UNKNOWN"
-    }
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    # 1. Check Postgres
-    try:
-        conn = psycopg2.connect(
-            host=os.getenv("DWH_HOST", "localhost"),
-            port=int(os.getenv("DWH_PORT", "5432")),
-            dbname=os.getenv("DWH_DB", "earthquake"),
-            user=os.getenv("DWH_USER", "postgres"),
-            password=os.getenv("DWH_PASSWORD", "postgres"),
-        )
-        conn.close()
-        checks["postgres"] = "OK"
-    except Exception as e:
-        checks["postgres"] = f"FAIL: {str(e)}"
+# Custom exception handlers
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions with consistent JSON format"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": exc.status_code,
+                "message": exc.detail,
+                "path": str(request.url.path)
+            }
+        }
+    )
 
-    # 2. Check Redis
-    try:
-        await redis_client.ping()
-        checks["redis"] = "OK"
-    except Exception as e:
-        checks["redis"] = f"FAIL: {str(e)}"
 
-    return checks
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors"""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": 422,
+                "message": "Validation error",
+                "details": exc.errors()
+            }
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Catch-all exception handler"""
+    logger.exception(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": 500,
+                "message": "Internal server error"
+            }
+        }
+    )
+
+
+# Include routers
+app.include_router(health.router, tags=["Health"])
+
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 API service starting up...")
+    logger.info(f"Environment: {settings.app_env}")
+    logger.info(f"CORS origins: {settings.cors_origins}")
+
+
+# Shutdown event
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("🛑 API service shutting down...")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "api.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )

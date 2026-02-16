@@ -18,19 +18,38 @@ dependencies = [
   "reverse_geocoder>=1.5.1",
   "dagster>=1.6.0",
   "dagster-webserver>=1.6.0",
+  # API dependencies
   "fastapi>=0.109.0",
-  "uvicorn>=0.27.0",
+  "uvicorn[standard]>=0.27.0",
   "redis>=5.0.0",
+  "python-multipart>=0.0.9",
+  "python-jose[cryptography]>=3.3.0",
+  "passlib[bcrypt]>=1.7.4",
+  "sqlalchemy>=2.0.0",
+  "email-validator>=2.1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
   "ruff>=0.6.0",
+  "mypy>=1.8.0",
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.23.0",
+  "httpx>=0.26.0",
 ]
 
 [tool.setuptools]
-packages = ["pipeline"]
+packages = ["pipeline", "api"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
