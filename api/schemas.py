@@ -1,3 +1,7 @@
+"""
+Global request/response schemas.
+Domain-specific schemas live in their own modules (e.g. api/auth/schemas.py).
+"""
 from pydantic import BaseModel
 
 
@@ -12,7 +16,6 @@ class ErrorResponse(BaseModel):
 
 
 class SuccessResponse(BaseModel):
-    """Standard success response"""
     success: bool = True
     message: str
     data: dict | None = None

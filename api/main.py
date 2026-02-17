@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.config import Settings
+from api.health.router import router as health_router
 from api.middleware.rate_limit import RateLimitMiddleware
-from api.routers import health
 from api.utils.redis_client import redis_manager
 
 logging.basicConfig(
@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-settings = Settings.from_env()
+settings = Settings()
 
 # ── 1. Redis ──────────────────────────────────────────────────────────────────
 _redis_client = None
@@ -34,20 +34,23 @@ except Exception as e:
 async def lifespan(app: FastAPI):
     logger.info("🚀 API service started")
     logger.info(f"Environment: {settings.app_env}")
+    logger.info(f"Docs: {'enabled' if settings.app_env == 'dev' else 'disabled'}")
     logger.info(f"Rate limiting: {'enabled' if _redis_client else 'disabled'}")
     yield
     logger.info("🛑 API service shutting down...")
     redis_manager.close()
 
 
-# ── 3. FastAPI app ────────────────────────────────────────────────────────────
+# ── 3. FastAPI app (docs only in dev) ─────────────────────────────────────────
+_dev = settings.app_env == "dev"
+
 app = FastAPI(
     title="Earthquake Platform API",
     description="Real-time earthquake monitoring and alerting system",
     version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url="/docs" if _dev else None,
+    redoc_url="/redoc" if _dev else None,
+    openapi_url="/openapi.json" if _dev else None,
     lifespan=lifespan,
 )
 
@@ -62,7 +65,7 @@ if _redis_client is not None:
     )
     logger.info("✅ Rate limiting middleware registered")
 else:
-    logger.warning("⚠️  Running without rate limiting (Redis unavailable)")
+    logger.warning("⚠️  Running without rate limiting")
 
 app.add_middleware(
     CORSMiddleware,
@@ -111,4 +114,4 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 # ── 6. Routers ────────────────────────────────────────────────────────────────
-app.include_router(health.router, tags=["Health"])
+app.include_router(health_router)
