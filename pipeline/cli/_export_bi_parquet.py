@@ -4,7 +4,7 @@ import argparse
 
 from pipeline.config.pg_settings import PostgresSettings
 from pipeline.config.settings import Settings
-from pipeline.jobs.export_bi_to_parquet_job import ExportBIToParquetJob
+from pipeline.jobs._export_bi_to_parquet_job import ExportBIToParquetJob
 from pipeline.storage.s3_storage import S3Storage
 from pipeline.warehouse.pg import PostgresRepository
 

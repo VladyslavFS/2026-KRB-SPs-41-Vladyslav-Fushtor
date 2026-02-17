@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from datetime import datetime
+
 import psycopg2
 import redis
+from fastapi import APIRouter
+from pydantic import BaseModel
 
-from api.config import Settings
-from api.dependencies import get_settings
+from api.dependencies import SettingsDep
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ class HealthResponse(BaseModel):
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health_check(settings: Settings = Depends(get_settings)):
+async def health_check(settings: SettingsDep):
     """
     Health check endpoint.
     Returns service status and dependency health.

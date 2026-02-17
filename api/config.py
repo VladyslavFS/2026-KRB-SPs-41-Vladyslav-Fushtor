@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import List
 
 
 @dataclass(frozen=True)
@@ -28,7 +27,7 @@ class Settings:
     aws_secret_access_key: str | None
     aws_region: str
     
-    cors_origins: List[str]
+    cors_origins: list[str]
     
     jwt_secret_key: str
     jwt_algorithm: str

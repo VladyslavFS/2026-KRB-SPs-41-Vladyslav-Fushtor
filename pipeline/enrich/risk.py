@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 def calculate_risk_class(mag: float | None, depth: float | None) -> str:
     """
     Calculates seismic risk class based on magnitude and depth.

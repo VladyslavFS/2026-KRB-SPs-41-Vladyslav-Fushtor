@@ -1,16 +1,18 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel
+
+
+class ErrorDetail(BaseModel):
+    code: int
+    message: str
+    details: dict | None = None
 
 
 class ErrorResponse(BaseModel):
-    """Standard error response"""
-    code: int
-    message: str
-    details: Optional[dict] = None
+    error: ErrorDetail
 
 
 class SuccessResponse(BaseModel):
     """Standard success response"""
     success: bool = True
     message: str
-    data: Optional[dict] = None
+    data: dict | None = None
