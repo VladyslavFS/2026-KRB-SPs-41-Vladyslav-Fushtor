@@ -42,3 +42,26 @@ class InvalidToken(HTTPException):
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+class RefreshTokenExpired(HTTPException):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token expired",
+        )
+
+
+class RefreshTokenInvalid(HTTPException):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+
+class RefreshTokenRevoked(HTTPException):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token revoked",
+        )

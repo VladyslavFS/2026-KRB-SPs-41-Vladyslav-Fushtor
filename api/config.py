@@ -48,6 +48,10 @@ class Settings(BaseSettings):
         15, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES"
     )
 
+    # ── Refresh tokens ────────────────────────────────────────────────────────
+    jwt_refresh_token_expire_days: int = Field(30, alias="JWT_REFRESH_TOKEN_EXPIRE_DAYS")
+    jwt_refresh_token_bytes: int = Field(32, alias="JWT_REFRESH_TOKEN_BYTES")
+
     # ── Computed ──────────────────────────────────────────────────────────────
     @computed_field
     @property

@@ -13,7 +13,6 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-
 # ── Responses ─────────────────────────────────────────────────────────────────
 
 class UserOut(BaseModel):
@@ -24,10 +23,17 @@ class UserOut(BaseModel):
     last_login: datetime | None = None
 
 
+class JWTUser(BaseModel):
+    user_id: int
+    email: EmailStr
+    is_active: bool
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    expires_in: int  # seconds
+    expires_in: int               # access seconds
+    refresh_expires_in: int       # refresh seconds
 
 
 class RegisterOut(BaseModel):

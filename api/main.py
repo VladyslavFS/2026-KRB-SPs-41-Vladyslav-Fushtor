@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from api.auth.router import router as auth_router
 from api.config import Settings
 from api.health.router import router as health_router
 from api.middleware.rate_limit import RateLimitMiddleware
@@ -115,3 +116,4 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # ── 6. Routers ────────────────────────────────────────────────────────────────
 app.include_router(health_router)
+app.include_router(auth_router)
