@@ -29,7 +29,7 @@ from api.auth.service import (
 )
 from api.dependencies import DBConnDep, SettingsDep
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
 
 def _issue_tokens(user: UserOut, db, settings) -> tuple[TokenOut, str]:
