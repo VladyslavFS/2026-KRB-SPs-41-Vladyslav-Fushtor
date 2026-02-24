@@ -1,11 +1,11 @@
-from dagster import asset, Output, AssetExecutionContext, HourlyPartitionsDefinition
 from datetime import datetime, timedelta, timezone
 
-from pipeline.config.settings import Settings
-from pipeline.storage.s3_storage import S3Storage
-from pipeline.clients.usgs_client import USGSClient
-from pipeline.jobs.ingest_raw_job import RawIngestionJob
+from dagster import AssetExecutionContext, HourlyPartitionsDefinition, Output, asset
 
+from pipeline.clients.usgs_client import USGSClient
+from pipeline.config.settings import Settings
+from pipeline.jobs.ingest_raw_job import RawIngestionJob
+from pipeline.storage.s3_storage import S3Storage
 
 hourly_partitions = HourlyPartitionsDefinition(start_date="2026-01-01-00:00")
 

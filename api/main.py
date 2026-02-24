@@ -13,6 +13,7 @@ from api.health.router import router as health_router
 from api.middleware.rate_limit import RateLimitMiddleware
 from api.utils.redis_client import redis_manager
 from api.v1.events.router import router as events_router
+from api.v1.users.router import router as users_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -119,3 +120,4 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(events_router)
+app.include_router(users_router)

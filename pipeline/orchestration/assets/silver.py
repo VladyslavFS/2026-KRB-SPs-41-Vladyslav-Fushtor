@@ -1,10 +1,12 @@
-from dagster import asset, Output, AssetExecutionContext, AssetIn
 from datetime import datetime, timedelta, timezone
 
+from dagster import AssetExecutionContext, AssetIn, Output, asset
+
 from pipeline.config.settings import Settings
-from pipeline.storage.s3_storage import S3Storage
 from pipeline.jobs.write_silver_job import SilverWriteJob
 from pipeline.orchestration.assets.ingestion import hourly_partitions
+from pipeline.storage.s3_storage import S3Storage
+
 
 @asset(
     partitions_def=hourly_partitions,
