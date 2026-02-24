@@ -13,7 +13,7 @@ from api.v1.events.service import (
 router = APIRouter(prefix="/api/v1/events", tags=["Events"])
 
 
-@router.get("", response_model=PaginatedEvents)
+@router.get("", response_model=PaginatedEvents, summary="List earthquake events")
 def read_events(
     db: DBConnDep,
     mag_min: float | None = Query(None, description="Minimum magnitude"),
@@ -35,7 +35,7 @@ def read_events(
     )
 
 
-@router.get("/stats", response_model=EventStats)
+@router.get("/stats", response_model=EventStats, summary="Event statistics")
 def read_events_stats(
     db: DBConnDep,
     hours: int = Query(24, ge=1, description="Stats for last N hours"),
@@ -46,7 +46,7 @@ def read_events_stats(
     return get_events_stats(db=db, hours=hours)
 
 
-@router.get("/top-daily", response_model=list[str])
+@router.get("/top-daily", response_model=list[str], summary="Available top-daily dates")
 def read_top_daily_days(
     db: DBConnDep,
     limit: int = Query(30, ge=1, le=365, description="Number of days to return"),
@@ -57,7 +57,12 @@ def read_top_daily_days(
     return get_top_daily_days(db=db, limit=limit)
 
 
-@router.get("/top-daily/{day}", response_model=list[TopEventOut])
+@router.get(
+    "/top-daily/{day}",
+    response_model=list[TopEventOut],
+    summary="Top events for a specific day",
+    responses={404: {"description": "No data for requested day"}},
+)
 def read_top_daily(
     day: str,
     db: DBConnDep,
@@ -74,7 +79,12 @@ def read_top_daily(
     return events
 
 
-@router.get("/{event_id}", response_model=EventOut)
+@router.get(
+    "/{event_id}",
+    response_model=EventOut,
+    summary="Get event by ID",
+    responses={404: {"description": "Event not found"}},
+)
 def read_event_by_id(event_id: str, db: DBConnDep) -> EventOut:
     """
     Get detailed information about a single specific earthquake event by ID.

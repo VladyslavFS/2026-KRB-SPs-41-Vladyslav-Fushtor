@@ -84,7 +84,16 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str,
     )
 
 
-@router.post("/register", response_model=RegisterOut, status_code=201)
+@router.post(
+    "/register",
+    response_model=RegisterOut,
+    status_code=201,
+    summary="Register a new user",
+    responses={
+        409: {"description": "Email already registered"},
+        422: {"description": "Validation error"},
+    },
+)
 def register(
     body: RegisterRequest, 
     response: Response, 
@@ -119,7 +128,15 @@ def register(
     return RegisterOut(user=user, token=token)
 
 
-@router.post("/login", response_model=RegisterOut)
+@router.post(
+    "/login",
+    response_model=RegisterOut,
+    summary="Login with email and password",
+    responses={
+        401: {"description": "Invalid credentials"},
+        403: {"description": "Account disabled"},
+    },
+)
 def login(
     body: LoginRequest, 
     response: Response, 
@@ -166,7 +183,12 @@ def login(
     return RegisterOut(user=user, token=token)
 
 
-@router.post("/refresh", response_model=TokenOut)
+@router.post(
+    "/refresh",
+    response_model=TokenOut,
+    summary="Refresh access token using cookie",
+    responses={401: {"description": "Invalid, expired, or revoked refresh token"}},
+)
 def refresh(
     response: Response,
     db: DBConnDep, 
@@ -245,7 +267,11 @@ def refresh(
     )
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Logout and revoke refresh token",
+)
 def logout(
     response: Response,
     db: DBConnDep,
@@ -271,7 +297,12 @@ def logout(
     return None
 
 
-@router.get("/me", response_model=JWTUser)
+@router.get(
+    "/me",
+    response_model=JWTUser,
+    summary="Get current user from token",
+    responses={401: {"description": "Missing or invalid access token"}},
+)
 def me(current_user: CurrentUser) -> JWTUser:
     """
     Get current user profile statelessly directly from the token payload.

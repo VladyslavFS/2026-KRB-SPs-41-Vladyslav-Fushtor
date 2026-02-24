@@ -1,0 +1,315 @@
+{
+  "info": {
+    "name": "Earthquake Platform API",
+    "description": "Real-time earthquake monitoring and alerting system.\n\nBase URL: http://localhost:8000",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "description": "Liveness and readiness probes.",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "JWT authentication: register, login, token refresh, and logout.",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var data = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', data.token.access_token);",
+                  "    pm.test('Token saved', () => pm.expect(data.token.access_token).to.be.a('string'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/register",
+            "auth": { "type": "noauth" },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"securepass123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', data.token.access_token);",
+                  "    pm.test('Token saved', () => pm.expect(data.token.access_token).to.be.a('string'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/login",
+            "auth": { "type": "noauth" },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"securepass123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me (current user)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/me"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/refresh",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "description": "Public earthquake event feed with filtering, statistics, and daily rankings.",
+      "item": [
+        {
+          "name": "List Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/events?hours=24&mag_min=&severity=&limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "events"],
+              "query": [
+                { "key": "hours", "value": "24", "description": "Events from last N hours" },
+                { "key": "mag_min", "value": "", "description": "Minimum magnitude (optional)" },
+                { "key": "severity", "value": "", "description": "LOW / MEDIUM / HIGH (optional)" },
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            },
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Event Stats",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/events/stats?hours=24",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "events", "stats"],
+              "query": [
+                { "key": "hours", "value": "24" }
+              ]
+            },
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Top Daily — Available Days",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/events/top-daily?limit=30",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "events", "top-daily"],
+              "query": [
+                { "key": "limit", "value": "30" }
+              ]
+            },
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Top Daily — By Day",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/events/top-daily/2026-01-15",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Get Event by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/events/us2026abc",
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users — Saved Events",
+      "description": "Bookmark earthquake events with optional notes. Requires authentication.",
+      "item": [
+        {
+          "name": "Save Event",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/users/me/saved-events",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"us2026abc\",\n  \"note\": \"Strong quake near Tokyo\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Saved Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/saved-events?limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "me", "saved-events"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Remove Saved Event",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/users/me/saved-events/us2026abc"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users — Alert Rules",
+      "description": "Configurable notification rules per user. Requires authentication.",
+      "item": [
+        {
+          "name": "Create Alert Rule",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/users/me/alert-rules",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Strong quakes in Japan\",\n  \"min_magnitude\": 5.0,\n  \"max_depth_km\": 100.0,\n  \"region\": \"Japan\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Alert Rules",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/alert-rules?limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "me", "alert-rules"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Alert Rule by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/users/me/alert-rules/1"
+          }
+        },
+        {
+          "name": "Update Alert Rule",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/users/me/alert-rules/1",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated rule name\",\n  \"is_active\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Alert Rule",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/users/me/alert-rules/1"
+          }
+        }
+      ]
+    }
+  ]
+}

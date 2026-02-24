@@ -47,13 +47,42 @@ async def lifespan(app: FastAPI):
 # ── 3. FastAPI app (docs only in dev) ─────────────────────────────────────────
 _dev = settings.app_env == "dev"
 
+_openapi_tags = [
+    {
+        "name": "Health",
+        "description": "Liveness and readiness probes — checks DB and Redis connectivity.",
+    },
+    {
+        "name": "Auth",
+        "description": "JWT-based authentication: register, login, token refresh, and logout.",
+    },
+    {
+        "name": "Events",
+        "description": (
+            "Public earthquake event feed with filtering, "
+            "statistics, and daily rankings."
+        ),
+    },
+    {
+        "name": "Users",
+        "description": "Authenticated user features: saved events and alert rule management.",
+    },
+]
+
 app = FastAPI(
     title="Earthquake Platform API",
-    description="Real-time earthquake monitoring and alerting system",
+    description=(
+        "Real-time earthquake monitoring and alerting system.\n\n"
+        "- **Events** — paginated feed from USGS with magnitude, depth, and severity filters\n"
+        "- **Top Daily** — ranked daily earthquake summaries\n"
+        "- **Saved Events** — bookmark earthquakes with optional notes\n"
+        "- **Alert Rules** — configurable notification rules per user\n"
+    ),
     version="0.1.0",
     docs_url="/docs" if _dev else None,
     redoc_url="/redoc" if _dev else None,
     openapi_url="/openapi.json" if _dev else None,
+    openapi_tags=_openapi_tags,
     lifespan=lifespan,
 )
 

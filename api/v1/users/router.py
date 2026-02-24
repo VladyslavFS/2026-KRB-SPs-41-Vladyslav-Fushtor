@@ -27,7 +27,13 @@ router = APIRouter(prefix="/api/v1/users/me", tags=["Users"])
 
 # ── Saved Events ──────────────────────────────────────────────────────────────
 
-@router.post("/saved-events", response_model=SavedEventOut, status_code=201)
+@router.post(
+    "/saved-events",
+    response_model=SavedEventOut,
+    status_code=201,
+    summary="Save an earthquake event",
+    responses={401: {"description": "Not authenticated"}},
+)
 def create_saved_event(
     body: SaveEventRequest,
     user: CurrentUser,
@@ -45,7 +51,12 @@ def create_saved_event(
     )
 
 
-@router.get("/saved-events", response_model=PaginatedSavedEvents)
+@router.get(
+    "/saved-events",
+    response_model=PaginatedSavedEvents,
+    summary="List saved events",
+    responses={401: {"description": "Not authenticated"}},
+)
 def read_saved_events(
     user: CurrentUser,
     db: DBConnDep,
@@ -66,6 +77,11 @@ def read_saved_events(
 @router.delete(
     "/saved-events/{event_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a saved event",
+    responses={
+        401: {"description": "Not authenticated"},
+        404: {"description": "Saved event not found"},
+    },
 )
 def remove_saved_event(
     event_id: str,
@@ -86,7 +102,13 @@ def remove_saved_event(
 
 # ── Alert Rules ───────────────────────────────────────────────────────────────
 
-@router.post("/alert-rules", response_model=AlertRuleOut, status_code=201)
+@router.post(
+    "/alert-rules",
+    response_model=AlertRuleOut,
+    status_code=201,
+    summary="Create an alert rule",
+    responses={401: {"description": "Not authenticated"}},
+)
 def create_rule(
     body: AlertRuleCreate,
     user: CurrentUser,
@@ -106,7 +128,12 @@ def create_rule(
     )
 
 
-@router.get("/alert-rules", response_model=PaginatedAlertRules)
+@router.get(
+    "/alert-rules",
+    response_model=PaginatedAlertRules,
+    summary="List alert rules",
+    responses={401: {"description": "Not authenticated"}},
+)
 def read_rules(
     user: CurrentUser,
     db: DBConnDep,
@@ -124,7 +151,12 @@ def read_rules(
     )
 
 
-@router.get("/alert-rules/{alert_rule_id}", response_model=AlertRuleOut)
+@router.get(
+    "/alert-rules/{alert_rule_id}",
+    response_model=AlertRuleOut,
+    summary="Get an alert rule by ID",
+    responses={401: {"description": "Not authenticated"}, 404: {"description": "Rule not found"}},
+)
 def read_rule(
     alert_rule_id: int,
     user: CurrentUser,
@@ -142,7 +174,12 @@ def read_rule(
     return rule
 
 
-@router.patch("/alert-rules/{alert_rule_id}", response_model=AlertRuleOut)
+@router.patch(
+    "/alert-rules/{alert_rule_id}",
+    response_model=AlertRuleOut,
+    summary="Update an alert rule",
+    responses={401: {"description": "Not authenticated"}, 404: {"description": "Rule not found"}},
+)
 def patch_rule(
     alert_rule_id: int,
     body: AlertRuleUpdate,
@@ -170,6 +207,8 @@ def patch_rule(
 @router.delete(
     "/alert-rules/{alert_rule_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an alert rule",
+    responses={401: {"description": "Not authenticated"}, 404: {"description": "Rule not found"}},
 )
 def remove_rule(
     alert_rule_id: int,
