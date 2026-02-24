@@ -49,3 +49,19 @@ class EventStats(BaseModel):
     max_mag: float | None = None
     tsunami_events: int
     avg_depth: float | None = None
+
+
+class TopEventOut(BaseModel):
+    day: str
+    rank: int
+    event_id: str
+    time: datetime
+    mag: float | None = None
+    depth: float | None = None
+    place: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    tsunami: int | None = None
+    url: str | None = None
+    net: str | None = None
+    status: str | None = None

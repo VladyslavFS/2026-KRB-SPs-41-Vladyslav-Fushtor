@@ -3,7 +3,7 @@ Service layer for events: logic for querying the database.
 """
 from psycopg2.extensions import connection
 
-from api.v1.events.schemas import EventOut, EventStats, PaginatedEvents
+from api.v1.events.schemas import EventOut, EventStats, PaginatedEvents, TopEventOut
 
 
 def get_events(
@@ -103,3 +103,38 @@ def get_events_stats(db: connection, hours: int = 24) -> EventStats:
             tsunami_events=row[2] or 0,
             avg_depth=row[3]
         )
+
+
+def get_top_daily_days(db: connection, limit: int = 30) -> list[str]:
+    with db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT DISTINCT day
+            FROM bi.top_events_daily
+            ORDER BY day DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        return [str(row[0]) for row in cur.fetchall()]
+
+
+def get_top_daily_by_day(db: connection, day: str) -> list[TopEventOut]:
+    with db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT day, rank, event_id, time, mag, depth,
+                   place, latitude, longitude, tsunami, url, net, status
+            FROM bi.top_events_daily
+            WHERE day = %s
+            ORDER BY rank ASC
+            """,
+            (day,),
+        )
+        cols = [desc[0] for desc in cur.description]
+        rows = cur.fetchall()
+
+    return [
+        TopEventOut(**dict(zip(cols, row, strict=False)))
+        for row in rows
+    ]

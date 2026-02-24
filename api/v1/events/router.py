@@ -1,8 +1,14 @@
 from fastapi import APIRouter, HTTPException, Query, status
 
 from api.dependencies import DBConnDep
-from api.v1.events.schemas import EventOut, EventStats, PaginatedEvents
-from api.v1.events.service import get_event_by_id, get_events, get_events_stats
+from api.v1.events.schemas import EventOut, EventStats, PaginatedEvents, TopEventOut
+from api.v1.events.service import (
+    get_event_by_id,
+    get_events,
+    get_events_stats,
+    get_top_daily_by_day,
+    get_top_daily_days,
+)
 
 router = APIRouter(prefix="/api/v1/events", tags=["Events"])
 
@@ -38,6 +44,34 @@ def read_events_stats(
     Get aggregated statistics about events in the specified time window.
     """
     return get_events_stats(db=db, hours=hours)
+
+
+@router.get("/top-daily", response_model=list[str])
+def read_top_daily_days(
+    db: DBConnDep,
+    limit: int = Query(30, ge=1, le=365, description="Number of days to return"),
+) -> list[str]:
+    """
+    Get available days that have top events data.
+    """
+    return get_top_daily_days(db=db, limit=limit)
+
+
+@router.get("/top-daily/{day}", response_model=list[TopEventOut])
+def read_top_daily(
+    day: str,
+    db: DBConnDep,
+) -> list[TopEventOut]:
+    """
+    Get top earthquake events for a specific day, ranked by magnitude.
+    """
+    events = get_top_daily_by_day(db=db, day=day)
+    if not events:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No top events found for day {day}",
+        )
+    return events
 
 
 @router.get("/{event_id}", response_model=EventOut)
