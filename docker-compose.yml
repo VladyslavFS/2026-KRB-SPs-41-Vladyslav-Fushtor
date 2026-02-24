@@ -46,7 +46,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       DWH_HOST: postgres_dwh
-      CORS_ORIGINS: http://localhost:8501,http://localhost:3000,http://localhost:3001
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
     volumes:
       - ./:/app
     depends_on:
@@ -60,20 +60,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-  streamlit:
-    build: .
-    working_dir: /app
-    volumes:
-      - ./:/app
-    env_file:
-      - .env
-    environment:
-      API_BASE_URL: http://api:8000
-    ports:
-      - "8501:8501"
-    depends_on:
-      - api
 
   frontend:
     build: ./frontend
