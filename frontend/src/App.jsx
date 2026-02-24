@@ -2,22 +2,10 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
+import FeedPage from "./pages/FeedPage";
 import LoginPage from "./pages/LoginPage";
 
-// Placeholder pages — will be replaced in R3/R4
-function FeedPage() {
-  return (
-    <div className="main">
-      <div className="page-header">
-        <h2>Earthquake Feed</h2>
-        <p className="page-header__sub">Real-time seismic activity monitoring</p>
-      </div>
-      <div className="info-box info-box--info">
-        Feed page coming in R3.
-      </div>
-    </div>
-  );
-}
+// Placeholder pages — will be replaced in R4
 
 function TopEventsPage() {
   return (
