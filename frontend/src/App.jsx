@@ -3,51 +3,10 @@ import Sidebar from "./components/Sidebar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import FeedPage from "./pages/FeedPage";
+import TopEventsPage from "./pages/TopEventsPage";
+import SavedEventsPage from "./pages/SavedEventsPage";
+import AlertRulesPage from "./pages/AlertRulesPage";
 import LoginPage from "./pages/LoginPage";
-
-// Placeholder pages — will be replaced in R4
-
-function TopEventsPage() {
-  return (
-    <div className="main">
-      <div className="page-header">
-        <h2>Top Events Daily</h2>
-        <p className="page-header__sub">Strongest earthquakes by day</p>
-      </div>
-      <div className="info-box info-box--info">
-        Top Events page coming in R4.
-      </div>
-    </div>
-  );
-}
-
-function SavedEventsPage() {
-  return (
-    <div className="main">
-      <div className="page-header">
-        <h2>Saved Events</h2>
-        <p className="page-header__sub">Your bookmarked earthquakes</p>
-      </div>
-      <div className="info-box info-box--info">
-        Saved Events page coming in R4.
-      </div>
-    </div>
-  );
-}
-
-function AlertRulesPage() {
-  return (
-    <div className="main">
-      <div className="page-header">
-        <h2>Alert Rules</h2>
-        <p className="page-header__sub">Manage notification criteria</p>
-      </div>
-      <div className="info-box info-box--info">
-        Alert Rules page coming in R4.
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   return (

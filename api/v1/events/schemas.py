@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -52,7 +52,7 @@ class EventStats(BaseModel):
 
 
 class TopEventOut(BaseModel):
-    day: str
+    day: date
     rank: int
     event_id: str
     time: datetime

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { apiGetEvents } from "../api/client";
+import { apiGetEvents, apiSaveEvent } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 import KpiCard from "../components/KpiCard";
 import EventMap from "../components/EventMap";
 import EventTable from "../components/EventTable";
 
 export default function FeedPage() {
+  const { token } = useAuth();
   const [events, setEvents] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -120,7 +122,10 @@ export default function FeedPage() {
         <div className="spinner"></div>
       ) : (
         <>
-          <EventMap events={events} />
+          <EventMap
+            events={events}
+            onSave={token ? (eventId, note) => apiSaveEvent(token, eventId, note) : undefined}
+          />
           <EventTable events={events} showSave />
           <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 8 }}>
             Showing {events.length} of {total} events

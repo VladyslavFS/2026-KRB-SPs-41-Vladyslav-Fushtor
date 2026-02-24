@@ -14,7 +14,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     Rate limiting middleware using Redis sliding window.
     
     Limits:
-    - Anonymous (by IP): 10 requests/minute
+    - Anonymous (by IP): 60 requests/minute
     - Authenticated (by user_id): 100 requests/minute
     """
     
@@ -22,7 +22,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self,
         app,
         redis_client,
-        anonymous_limit: int = 10,
+        anonymous_limit: int = 60,
         authenticated_limit: int = 100,
         window_seconds: int = 60,
         exclude_paths: list[str] = None
@@ -43,16 +43,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if any(request.url.path.startswith(path) for path in self.exclude_paths):
             return await call_next(request)
         
-        # Determine identifier (user_id or IP)
-        # For now use IP, will be extended with user_id after auth is implemented
-        identifier = request.client.host if request.client else "unknown"
-        user_id = request.state.__dict__.get("user_id")  # Will be set by auth middleware
-        
-        if user_id:
-            key = f"rl:user:{user_id}"
+        # Determine identifier and limit
+        client_ip = request.client.host if request.client else "unknown"
+        auth_header = request.headers.get("authorization", "")
+
+        if auth_header.startswith("Bearer "):
+            # Authenticated — key by token prefix, higher limit
+            token_prefix = auth_header[7:39]  # first 32 chars
+            key = f"rl:token:{token_prefix}"
             limit = self.authenticated_limit
         else:
-            key = f"rl:ip:{identifier}"
+            key = f"rl:ip:{client_ip}"
             limit = self.anonymous_limit
         
         # Check rate limit
