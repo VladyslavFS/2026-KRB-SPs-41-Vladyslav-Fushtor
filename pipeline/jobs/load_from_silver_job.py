@@ -64,10 +64,9 @@ class LoadFromSilverJob:
             local_path = os.path.join(tmpdir, "silver.parquet")
             self.storage.download_file(key=silver_key, local_path=local_path)
 
-            con = duckdb.connect()
-            # Read parquet into pandas DataFrame
-            df = con.execute(f"SELECT * FROM read_parquet('{local_path}')").df()
-            con.close()
+            with duckdb.connect() as con:
+                # Read parquet into pandas DataFrame
+                df = con.execute(f"SELECT * FROM read_parquet('{local_path}')").df()
 
         rows: list[dict] = []
         for _, r in df.iterrows():

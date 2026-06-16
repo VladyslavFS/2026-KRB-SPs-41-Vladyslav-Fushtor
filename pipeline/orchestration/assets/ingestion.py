@@ -4,7 +4,7 @@ from dagster import AssetExecutionContext, HourlyPartitionsDefinition, Output, a
 
 from pipeline.clients.usgs_client import USGSClient
 from pipeline.config.settings import Settings
-from pipeline.jobs.ingest_raw_job import RawIngestionJob
+from pipeline.jobs.ingest_raw_job import BronzeIngestJob
 from pipeline.storage.s3_storage import S3Storage
 
 hourly_partitions = HourlyPartitionsDefinition(start_date="2026-01-01-00:00")
@@ -27,7 +27,7 @@ def raw_geojson(context: AssetExecutionContext):
     storage = S3Storage(settings)
     client = USGSClient()
     
-    job = RawIngestionJob(settings=settings, storage=storage, client=client)
+    job = BronzeIngestJob(settings=settings, storage=storage, client=client)
 
     s3_key = job.run(window_start=window_start, window_end=window_end)
     

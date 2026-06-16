@@ -38,9 +38,9 @@ class SilverWriteJob:
         for f in features:
             props = f.get("properties", {})
             geometry = f.get("geometry", {})
-            id = f.get("id")
+            event_id = f.get("id")
 
-            if not id:
+            if not event_id:
                 continue
 
             coords = geometry.get("coordinates", [])
@@ -68,7 +68,7 @@ class SilverWriteJob:
             updated_dt = datetime.fromtimestamp(updated_ms / 1000, tz=timezone.utc).isoformat()
 
             row = {
-                "id": str(id),
+                "id": str(event_id),
                 "time": time_dt,
                 "updated": updated_dt,
                 "latitude": float(lat) if lat is not None else None,
@@ -108,38 +108,37 @@ class SilverWriteJob:
                  "source_window_start", "source_window_end"
              ])
         else:
-            df = pd.DataFrame(rows)
+             df = pd.DataFrame(rows)
 
-        conn = duckdb.connect()
-        conn.register("rows", df)
+        with duckdb.connect() as conn:
+            conn.register("rows", df)
 
-        conn.execute(
-            """
-            CREATE OR REPLACE TABLE silver AS
-            SELECT *
-            FROM (
-                SELECT
-                    *,
-                    row_number() OVER (PARTITION BY id ORDER BY updated DESC) as rn
-                FROM rows
+            conn.execute(
+                """
+                CREATE OR REPLACE TABLE silver AS
+                SELECT *
+                FROM (
+                    SELECT
+                        *,
+                        row_number() OVER (PARTITION BY id ORDER BY updated DESC) as rn
+                    FROM rows
+                )
+                WHERE rn = 1;
+                """
             )
-            WHERE rn = 1;
-            """
-        )
 
-        date = window_start.date().isoformat()
-        hour = f"{window_start.hour:02d}"
-        silver_key = (
-            "silver/earthquake/events/"
-            f"date={date}/hour={hour}/"
-            f"part-{window_start.strftime('%Y%m%dT%H%M%SZ')}.parquet"
-        )
+            date = window_start.date().isoformat()
+            hour = f"{window_start.hour:02d}"
+            silver_key = (
+                "silver/earthquake/events/"
+                f"date={date}/hour={hour}/"
+                f"part-{window_start.strftime('%Y%m%dT%H%M%SZ')}.parquet"
+            )
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            local_path = os.path.join(tmpdir, "silver.parquet")
-            conn.execute(f"COPY silver TO '{local_path}' (FORMAT 'parquet');")
-            conn.close()
-            self.storage.upload_file(local_path=local_path, key=silver_key, content_type="application/octet-stream")
+            with tempfile.TemporaryDirectory() as tmpdir:
+                local_path = os.path.join(tmpdir, "silver.parquet")
+                conn.execute(f"COPY silver TO '{local_path}' (FORMAT 'parquet');")
+                self.storage.upload_file(local_path=local_path, key=silver_key, content_type="application/octet-stream")
 
 
         return silver_key

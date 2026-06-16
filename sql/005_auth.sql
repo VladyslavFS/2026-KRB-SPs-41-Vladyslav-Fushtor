@@ -6,7 +6,9 @@ CREATE TABLE IF NOT EXISTS app.users (
     password_hash   TEXT NOT NULL,
     is_active       BOOLEAN NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_login      TIMESTAMPTZ
+    last_login      TIMESTAMPTZ,
+    password_reset_token TEXT,
+    password_reset_expires_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS app.refresh_tokens (

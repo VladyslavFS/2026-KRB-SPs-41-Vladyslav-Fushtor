@@ -189,7 +189,7 @@ class PostgresRepository:
             execute_values(cur, sql, values, page_size=1000)
 
 
-    def insert_df(self, *, conn, table: str, df: pd.DataFrame) -> None:
+    def insert_df(self, *, conn, table: str, df: pd.DataFrame, on_conflict: str | None = None) -> None:
         """
         Generic bulk insert for pandas DataFrame.
         Columns in DF must match columns in Table.
@@ -204,6 +204,8 @@ class PostgresRepository:
         values = [tuple(x) for x in df_clean.to_numpy()]
         
         sql = f"INSERT INTO {table} ({', '.join(columns)}) VALUES %s"
+        if on_conflict:
+            sql += f" {on_conflict}"
         
         with conn.cursor() as cur:
             execute_values(cur, sql, values, page_size=1000)

@@ -53,9 +53,21 @@ export default function FeedPage() {
               value={hours}
               onChange={(e) => setHours(Number(e.target.value))}
             >
-              {[1, 6, 12, 24, 48, 72, 168].map((h) => (
-                <option key={h} value={h}>
-                  {h}h{h >= 24 ? ` (${h / 24}d)` : ""}
+              {[
+                { value: 1, label: "1h" },
+                { value: 6, label: "6h" },
+                { value: 12, label: "12h" },
+                { value: 24, label: "24h (1d)" },
+                { value: 48, label: "48h (2d)" },
+                { value: 72, label: "72h (3d)" },
+                { value: 168, label: "168h (7d)" },
+                { value: 720, label: "720h (30d)" },
+                { value: 2160, label: "2160h (90d)" },
+                { value: 8760, label: "8760h (365d)" },
+                { value: 0, label: "All time" },
+              ].map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
@@ -92,7 +104,7 @@ export default function FeedPage() {
               value={limit}
               onChange={(e) => setLimit(Number(e.target.value))}
             >
-              {[50, 100, 200, 500, 1000].map((n) => (
+              {[50, 100, 200, 500, 1000, 2000, 5000, 10000].map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>

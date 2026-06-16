@@ -21,7 +21,7 @@ def _daterange(start: date, end_exclusive: date) -> Iterable[date]:
 
 
 @dataclass(frozen=True)
-class LoadBIStoreJob:
+class LoadBIToServingLayerJob:
     """
     Syncs Gold Parquet from S3 to Postgres BI tables (Serving Layer).
     Strategy: Delete-Insert for specific days.
@@ -63,13 +63,12 @@ class LoadBIStoreJob:
             local_path = os.path.join(tmpdir, "data.parquet")
             self.storage.download_file(key=latest_key, local_path=local_path)
 
-            con = duckdb.connect()
-            try:
-                 df = con.execute(f"SELECT * FROM read_parquet('{local_path}')").df()
-            except Exception:
-                 # Handle empty or corrupted parquet gracefully
-                 df = pd.DataFrame()
-            con.close()
+            with duckdb.connect() as con:
+                try:
+                     df = con.execute(f"SELECT * FROM read_parquet('{local_path}')").df()
+                except Exception:
+                     # Handle empty or corrupted parquet gracefully
+                     df = pd.DataFrame()
 
         if df.empty:
             self._delete_day(conn, table, d)
@@ -77,11 +76,19 @@ class LoadBIStoreJob:
 
         # Transactional Replace
         self._delete_day(conn, table, d)
-        self.repo.insert_df(conn=conn, table=f"bi.{table}", df=df)
+        on_conflict = None
+        if table == "event_feed":
+            on_conflict = "ON CONFLICT (event_id) DO NOTHING"
+        elif table == "top_events_daily":
+            on_conflict = "ON CONFLICT (day, rank) DO NOTHING"
+        elif table == "catalog_health_daily":
+            on_conflict = "ON CONFLICT (day) DO NOTHING"
+            
+        self.repo.insert_df(conn=conn, table=f"bi.{table}", df=df, on_conflict=on_conflict)
         print(f"  -> Loaded {d}: {len(df)} rows (source: {latest_key})")
 
     def _delete_day(self, conn, table: str, d: date):
-        date_col = "time::date" if table == "event_feed" else "day"
+        date_col = "(time AT TIME ZONE 'UTC')::date" if table == "event_feed" else "day"
         sql = f"DELETE FROM bi.{table} WHERE {date_col} = %s"
         with conn.cursor() as cur:
             cur.execute(sql, (d,))

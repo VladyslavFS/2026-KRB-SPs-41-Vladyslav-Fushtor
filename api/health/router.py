@@ -1,11 +1,9 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
-import psycopg2
-import redis as redis_lib
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from api.dependencies import SettingsDep
+from api.dependencies import DBConnDep, RedisDep, SettingsDep
 
 router = APIRouter(tags=["Health"])
 
@@ -19,7 +17,11 @@ class HealthCheck(BaseModel):
 
 
 @router.get("/health", response_model=HealthCheck)
-def health_check(settings: SettingsDep) -> HealthCheck:
+def health_check(
+    settings: SettingsDep,
+    db: DBConnDep,
+    redis_client: RedisDep,
+) -> HealthCheck:
     """Health check — verifies DB and Redis connectivity."""
     checks: dict[str, str] = {
         "api": "healthy",
@@ -28,22 +30,14 @@ def health_check(settings: SettingsDep) -> HealthCheck:
     }
 
     try:
-        conn = psycopg2.connect(
-            host=settings.db_host,
-            port=settings.db_port,
-            dbname=settings.db_name,
-            user=settings.db_user,
-            password=settings.db_password,
-            connect_timeout=3,
-        )
-        conn.close()
+        with db.cursor() as cur:
+            cur.execute("SELECT 1")
         checks["database"] = "healthy"
     except Exception as e:
         checks["database"] = f"unhealthy: {e}"
 
     try:
-        r = redis_lib.from_url(settings.redis_url, socket_connect_timeout=3)
-        r.ping()
+        redis_client.ping()
         checks["redis"] = "healthy"
     except Exception as e:
         checks["redis"] = f"unhealthy: {e}"
@@ -52,7 +46,7 @@ def health_check(settings: SettingsDep) -> HealthCheck:
 
     return HealthCheck(
         status=overall,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
         version="0.1.0",
         environment=settings.app_env,
         checks=checks,

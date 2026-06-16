@@ -35,6 +35,18 @@ export async function apiLogout(token) {
   return request("POST", "/api/v1/auth/logout", { token });
 }
 
+export async function apiForgotPassword(email) {
+  return request("POST", "/api/v1/auth/forgot-password", {
+    body: { email },
+  });
+}
+
+export async function apiResetPassword(token, newPassword) {
+  return request("POST", "/api/v1/auth/reset-password", {
+    body: { token, new_password: newPassword },
+  });
+}
+
 export async function apiGetMe(token) {
   return request("GET", "/api/v1/auth/me", { token });
 }

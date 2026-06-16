@@ -6,7 +6,7 @@ from pipeline.storage.s3_storage import S3Storage
 from pipeline.warehouse.pg import PostgresRepository
 
 from pipeline.jobs.build_gold_job import BuildGoldJob
-from pipeline.jobs.load_bi_to_serving_layer_job import LoadBIStoreJob
+from pipeline.jobs.load_bi_to_serving_layer_job import LoadBIToServingLayerJob
 from pipeline.orchestration.assets.ingestion import hourly_partitions
 
 
@@ -51,7 +51,7 @@ def bi_tables(context: AssetExecutionContext, gold_files: dict):
     pg_settings = PostgresSettings.from_env()
     repo = PostgresRepository(pg_settings)
     
-    job = LoadBIStoreJob(repo=repo, storage=storage, bucket=settings.s3_bucket)
+    job = LoadBIToServingLayerJob(repo=repo, storage=storage, bucket=settings.s3_bucket)
     job.run(days=days_to_sync)
     
     return Output(

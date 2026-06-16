@@ -179,9 +179,12 @@ def update_alert_rule(
     if not fields:
         return get_alert_rule_by_id(db, user_id, alert_rule_id)
 
+    ALLOWED_COLUMNS = {"name", "min_magnitude", "max_depth_km", "region", "is_active"}
     set_parts = []
     params = []
     for col, val in fields.items():
+        if col not in ALLOWED_COLUMNS:
+            raise ValueError(f"Invalid column: {col}")
         set_parts.append(f"{col} = %s")
         params.append(val)
 

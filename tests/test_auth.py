@@ -130,3 +130,60 @@ def test_logout(client, mock_db):
 
     res = client.post("/api/v1/auth/logout")
     assert res.status_code == 204
+
+
+# ── Forgot/Reset Password ─────────────────────────────────────────────────────
+
+def test_forgot_password_success(client, mock_db):
+    """POST /api/v1/auth/forgot-password → 200 with dev reset token when user exists."""
+    cursor = mock_db._cursor
+    cursor.set_results(
+        (1,),  # SELECT user_id FROM users
+        None,  # UPDATE user reset token
+    )
+
+    res = client.post("/api/v1/auth/forgot-password", json={"email": "user@test.com"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "reset_token_dev" in data
+    assert "link" in data["message"] or "sent" in data["message"]
+
+
+def test_forgot_password_user_not_found(client, mock_db):
+    """POST /api/v1/auth/forgot-password → 200 without dev reset token when user not found."""
+    cursor = mock_db._cursor
+    cursor.set_results(None)  # SELECT user_id -> not found
+
+    res = client.post("/api/v1/auth/forgot-password", json={"email": "unknown@test.com"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "reset_token_dev" not in data
+
+
+def test_reset_password_success(client, mock_db):
+    """POST /api/v1/auth/reset-password → 200 when token is valid."""
+    cursor = mock_db._cursor
+    cursor.set_results(
+        (1,),  # SELECT user_id FROM users with matching token
+        None,  # UPDATE password_hash
+    )
+
+    res = client.post("/api/v1/auth/reset-password", json={
+        "token": "valid_token",
+        "new_password": "newsecurepassword123"
+    })
+    assert res.status_code == 200
+    assert "reset successfully" in res.json()["message"]
+
+
+def test_reset_password_invalid_token(client, mock_db):
+    """POST /api/v1/auth/reset-password → 400 when token is invalid/expired."""
+    cursor = mock_db._cursor
+    cursor.set_results(None)  # SELECT user_id -> not found/invalid
+
+    res = client.post("/api/v1/auth/reset-password", json={
+        "token": "invalid_token",
+        "new_password": "newsecurepassword123"
+    })
+    assert res.status_code == 400
+    assert "Invalid or expired reset token" in res.json()["error"]["message"]

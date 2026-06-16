@@ -28,8 +28,9 @@ def get_events(
         conditions.append("severity = %s")
         params.append(severity)
         
-    if hours is not None:
-        conditions.append(f"time >= now() - interval '{hours} hours'")
+    if hours is not None and hours > 0:
+        conditions.append("time >= now() - interval %s")
+        params.append(f"{hours} hours")
         
     if conditions:
         where_clause = " AND " + " AND ".join(conditions)

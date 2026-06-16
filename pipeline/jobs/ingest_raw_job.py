@@ -9,7 +9,7 @@ from pipeline.storage.storage import ObjectStorage
 
 
 @dataclass
-class RawIngestionJob:
+class BronzeIngestJob:
     settings: Settings
     storage: ObjectStorage
     client: USGSClient

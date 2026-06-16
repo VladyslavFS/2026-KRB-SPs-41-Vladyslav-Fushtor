@@ -56,6 +56,26 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
+:root[data-theme="light"] {
+  /* Background — soft warm whites/greys */
+  --bg-primary: #f5f4f0;
+  --bg-secondary: #eae8e3;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-sidebar: #dfdad1;
+  --bg-input: #ffffff;
+  --bg-hover: #e6e0d5;
+
+  /* Text — deep charcoal/brown */
+  --text-primary: #1c1a17;
+  --text-secondary: #665f57;
+  --text-muted: #8a8175;
+
+  /* Border */
+  --border: rgba(0, 0, 0, 0.08);
+  --border-accent: rgba(212, 168, 67, 0.4);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
 /* ── Body ──────────────────────────────────────────────────── */
 
 html,

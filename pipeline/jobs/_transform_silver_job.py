@@ -4,6 +4,9 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from pipeline.enrich.geo import get_country_code
+from pipeline.enrich.risk import calculate_risk_class
+
 
 @dataclass(frozen=True)
 class SilverTransformJob:
@@ -40,15 +43,25 @@ class SilverTransformJob:
         for f in features:
             props = f.get("properties", {})
             geometry = f.get("geometry", {})
-            id = f.get("id")
+            event_id = f.get("id")
 
-            if not id:
+            if not event_id:
                 continue
 
             coords = geometry.get("coordinates", [])
             lon = coords[0] if len(coords) > 0 else None
             lat = coords[1] if len(coords) > 1 else None
             depth = coords[2] if len(coords) > 2 else None
+
+            country = None
+            if lat is not None and lon is not None:
+                country = get_country_code(float(lat), float(lon))
+
+            mag = props.get("mag")
+            risk_class = calculate_risk_class(
+                mag=float(mag) if mag is not None else None,
+                depth=float(depth) if depth is not None else None
+            )
 
             t_ms = props.get("time")
             u_ms = props.get("updated")
@@ -59,7 +72,7 @@ class SilverTransformJob:
             updated_dt = datetime.fromtimestamp(u_ms / 1000, tz=timezone.utc)
 
             row = {
-                "id": str(id),
+                "id": str(event_id),
                 "time": time_dt,
                 "updated": updated_dt,
                 "latitude": float(lat) if lat is not None else None,
@@ -74,6 +87,8 @@ class SilverTransformJob:
                 "url": props.get("url"),
                 "detail": props.get("detail"),
                 "tsunami": props.get("tsunami"),
+                "country": country,
+                "risk_class": risk_class,
                 "source_window_start": source_window_start,
                 "source_window_end": source_window_end,
             }

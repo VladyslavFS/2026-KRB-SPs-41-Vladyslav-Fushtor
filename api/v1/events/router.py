@@ -19,7 +19,7 @@ def read_events(
     mag_min: float | None = Query(None, description="Minimum magnitude"),
     severity: str | None = Query(None, description="Event severity classification"),
     hours: int | None = Query(None, description="Events from last N hours"),
-    limit: int = Query(50, ge=1, le=1000, description="Items per page"),
+    limit: int = Query(50, ge=1, le=10000, description="Items per page"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
 ) -> PaginatedEvents:
     """

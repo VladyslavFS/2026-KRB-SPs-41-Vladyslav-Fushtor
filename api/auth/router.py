@@ -1,4 +1,6 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+import hashlib
+import secrets
 
 from fastapi import APIRouter, Cookie, Response, status
 
@@ -7,15 +9,18 @@ from api.auth.exceptions import (
     AccountDisabled,
     EmailAlreadyExists,
     InvalidCredentials,
+    InvalidOrExpiredResetToken,
     RefreshTokenExpired,
     RefreshTokenInvalid,
     RefreshTokenRevoked,
 )
 from api.auth.schemas import (
+    ForgotPasswordRequest,
     JWTUser,
     LoginRequest,
     RegisterOut,
     RegisterRequest,
+    ResetPasswordRequest,
     TokenOut,
     UserOut,
 )
@@ -308,3 +313,93 @@ def me(current_user: CurrentUser) -> JWTUser:
     Get current user profile statelessly directly from the token payload.
     """
     return current_user
+
+
+@router.post(
+    "/forgot-password",
+    summary="Request password reset",
+)
+def forgot_password(
+    body: ForgotPasswordRequest,
+    db: DBConnDep,
+    settings: SettingsDep,
+) -> dict:
+    """
+    Generate a password reset token and save it to the database for the user.
+    """
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT user_id FROM app.users WHERE email = %s AND is_active = true",
+            (body.email,),
+        )
+        row = cur.fetchone()
+
+    if row:
+        user_id = row[0]
+        reset_plain = secrets.token_urlsafe(32)
+        reset_hash = hashlib.sha256(reset_plain.encode("utf-8")).hexdigest()
+        exp_at = datetime.now(UTC) + timedelta(hours=1)
+
+        with db.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE app.users
+                SET password_reset_token = %s, password_reset_expires_at = %s
+                WHERE user_id = %s
+                """,
+                (reset_hash, exp_at, user_id),
+            )
+        
+        # Dev helper
+        print(f"PASSWORD RESET LINK: http://localhost:3001/reset-password?token={reset_plain}")
+        
+        if settings.app_env in ("dev", "test"):
+            return {
+                "message": "If the email exists, a password reset link has been sent.",
+                "reset_token_dev": reset_plain,
+            }
+
+    return {"message": "If the email exists, a password reset link has been sent."}
+
+
+@router.post(
+    "/reset-password",
+    summary="Reset password with token",
+)
+def reset_password(
+    body: ResetPasswordRequest,
+    db: DBConnDep,
+) -> dict:
+    """
+    Reset user password using the provided reset token.
+    """
+    token_hash = hashlib.sha256(body.token.encode("utf-8")).hexdigest()
+    now = datetime.now(UTC)
+
+    with db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT user_id FROM app.users
+            WHERE password_reset_token = %s AND password_reset_expires_at > %s AND is_active = true
+            """,
+            (token_hash, now),
+        )
+        row = cur.fetchone()
+
+    if not row:
+        raise InvalidOrExpiredResetToken()
+
+    user_id = row[0]
+    new_hash = hash_password(body.new_password)
+
+    with db.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE app.users
+            SET password_hash = %s, password_reset_token = NULL, password_reset_expires_at = NULL
+            WHERE user_id = %s
+            """,
+            (new_hash, user_id),
+        )
+
+    return {"message": "Password has been reset successfully."}
