@@ -1,8 +1,12 @@
 """
-Service layer for events: logic for querying the database.
+Events service layer — thin facade over EventRepository.
+Kept for backward compatibility with existing router.py imports.
 """
+from __future__ import annotations
+
 from psycopg2.extensions import connection
 
+from api.v1.events.repository import EventRepository
 from api.v1.events.schemas import EventOut, EventStats, PaginatedEvents, TopEventOut
 
 
@@ -14,128 +18,22 @@ def get_events(
     limit: int = 50,
     offset: int = 0,
 ) -> PaginatedEvents:
-    base_query = "SELECT * FROM bi.event_feed WHERE 1=1"
-    count_query = "SELECT count(*) FROM bi.event_feed WHERE 1=1"
-    
-    params = []
-    conditions = []
-    
-    if mag_min is not None:
-        conditions.append("mag >= %s")
-        params.append(mag_min)
-        
-    if severity is not None:
-        conditions.append("severity = %s")
-        params.append(severity)
-        
-    if hours is not None and hours > 0:
-        conditions.append("time >= now() - interval %s")
-        params.append(f"{hours} hours")
-        
-    if conditions:
-        where_clause = " AND " + " AND ".join(conditions)
-        base_query += where_clause
-        count_query += where_clause
-        
-    # Get total count first
-    with db.cursor() as cur:
-        cur.execute(count_query, params)
-        total = cur.fetchone()[0]
-        
-    # Get page items
-    query = base_query + " ORDER BY time DESC LIMIT %s OFFSET %s"
-    page_params = params + [limit, offset]
-    
-    with db.cursor() as cur:
-        cur.execute(query, page_params)
-        # Fetch dictionary-like format using column names
-        cols = [desc[0] for desc in cur.description]
-        rows = cur.fetchall()
-        
-    items = []
-    for row in rows:
-        row_dict = dict(zip(cols, row, strict=False))
-        items.append(EventOut(**row_dict))
-        
-    return PaginatedEvents(
-        items=items,
-        total=total,
-        limit=limit,
-        offset=offset
+    return EventRepository(db).get_events(
+        mag_min=mag_min, severity=severity, hours=hours, limit=limit, offset=offset,
     )
 
 
 def get_event_by_id(db: connection, event_id: str) -> EventOut | None:
-    query = "SELECT * FROM ods.fct_earthquake_event WHERE id = %s"
-    
-    with db.cursor() as cur:
-        cur.execute(query, (event_id,))
-        row = cur.fetchone()
-        if not row:
-            return None
-        cols = [desc[0] for desc in cur.description]
-        row_dict = dict(zip(cols, row, strict=False))
-        
-        # Mapping differences between ods and bi if needed, 
-        # but ods has similar shape. ODS uses 'id', BI uses 'event_id'
-        row_dict["event_id"] = row_dict.pop("id", event_id)
-        
-        return EventOut(**row_dict)
+    return EventRepository(db).get_event_by_id(event_id)
 
 
 def get_events_stats(db: connection, hours: int = 24) -> EventStats:
-    query = f"""
-        SELECT 
-            count(*) as total_events,
-            max(mag) as max_mag,
-            sum(tsunami) as tsunami_events,
-            avg(depth) as avg_depth
-        FROM bi.event_feed
-        WHERE time >= now() - interval '{hours} hours'
-    """
-    
-    with db.cursor() as cur:
-        cur.execute(query)
-        row = cur.fetchone()
-        
-        return EventStats(
-            total_events=row[0] or 0,
-            max_mag=row[1],
-            tsunami_events=row[2] or 0,
-            avg_depth=row[3]
-        )
+    return EventRepository(db).get_events_stats(hours)
 
 
 def get_top_daily_days(db: connection, limit: int = 30) -> list[str]:
-    with db.cursor() as cur:
-        cur.execute(
-            """
-            SELECT DISTINCT day
-            FROM bi.top_events_daily
-            ORDER BY day DESC
-            LIMIT %s
-            """,
-            (limit,),
-        )
-        return [str(row[0]) for row in cur.fetchall()]
+    return EventRepository(db).get_top_daily_days(limit)
 
 
 def get_top_daily_by_day(db: connection, day: str) -> list[TopEventOut]:
-    with db.cursor() as cur:
-        cur.execute(
-            """
-            SELECT day, rank, event_id, time, mag, depth,
-                   place, latitude, longitude, tsunami, url, net, status
-            FROM bi.top_events_daily
-            WHERE day = %s
-            ORDER BY rank ASC
-            """,
-            (day,),
-        )
-        cols = [desc[0] for desc in cur.description]
-        rows = cur.fetchall()
-
-    return [
-        TopEventOut(**dict(zip(cols, row, strict=False)))
-        for row in rows
-    ]
+    return EventRepository(db).get_top_daily_by_day(day)

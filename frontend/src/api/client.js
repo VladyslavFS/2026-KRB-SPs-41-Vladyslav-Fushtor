@@ -1,21 +1,30 @@
 const BASE = "";
 
-async function request(method, path, { body, token } = {}) {
+async function request(method, path, { body, token, signal } = {}) {
   const headers = {};
   if (body) headers["Content-Type"] = "application/json";
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal,         // AbortController.signal — cancels in-flight request
+    });
 
-  if (res.status === 204) return null;
+    if (res.status === 204) return null;
 
-  const data = res.ok ? await res.json() : null;
-  return { ok: res.ok, status: res.status, data };
+    const data = res.ok ? await res.json() : null;
+    return { ok: res.ok, status: res.status, data };
+  } catch (err) {
+    // fetch throws DOMException("AbortError") when the request is cancelled.
+    // Return null so callers can do: if (res === null) return;
+    if (err.name === "AbortError") return null;
+    throw err;
+  }
 }
+
 
 // ── Auth ──────────────────────────────────────────────────────
 
@@ -53,7 +62,7 @@ export async function apiGetMe(token) {
 
 // ── Events (public) ──────────────────────────────────────────
 
-export async function apiGetEvents(params = {}) {
+export async function apiGetEvents(params = {}, signal = null) {
   const q = new URLSearchParams();
   if (params.hours) q.set("hours", params.hours);
   if (params.mag_min > 0) q.set("mag_min", params.mag_min);
@@ -62,7 +71,7 @@ export async function apiGetEvents(params = {}) {
   q.set("limit", params.limit || 200);
   q.set("offset", params.offset || 0);
 
-  return request("GET", `/api/v1/events?${q}`);
+  return request("GET", `/api/v1/events?${q}`, { signal });
 }
 
 export async function apiGetEventsStats(hours = 24) {

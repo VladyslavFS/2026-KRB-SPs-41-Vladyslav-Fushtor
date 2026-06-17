@@ -1,19 +1,15 @@
-from datetime import UTC, datetime, timedelta
-import hashlib
-import secrets
+"""
+Auth router — pure HTTP layer. All business logic delegated to AuthService.
+"""
+from __future__ import annotations
 
-from fastapi import APIRouter, Cookie, Response, status
+from typing import Annotated
 
+from fastapi import APIRouter, Cookie, Depends, Response, status
+
+from api.auth.auth_service import AuthService
 from api.auth.dependencies import CurrentUser
-from api.auth.exceptions import (
-    AccountDisabled,
-    EmailAlreadyExists,
-    InvalidCredentials,
-    InvalidOrExpiredResetToken,
-    RefreshTokenExpired,
-    RefreshTokenInvalid,
-    RefreshTokenRevoked,
-)
+from api.auth.password_service import PasswordService
 from api.auth.schemas import (
     ForgotPasswordRequest,
     JWTUser,
@@ -24,57 +20,34 @@ from api.auth.schemas import (
     TokenOut,
     UserOut,
 )
-from api.auth.service import (
-    create_access_token,
-    create_refresh_token_plain,
-    hash_password,
-    hash_refresh_token,
-    refresh_expires_at,
-    verify_password,
-)
+from api.auth.token_service import TokenService
 from api.dependencies import DBConnDep, SettingsDep
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
 
-def _issue_tokens(user: UserOut, db, settings) -> tuple[TokenOut, str]:
-    # 1) access
-    access = create_access_token(
-        user_id=user.user_id,
-        email=user.email,
-        is_active=user.is_active,
-        secret=settings.jwt_secret_key,
-        algorithm=settings.jwt_algorithm,
-        expires_minutes=settings.jwt_access_token_expire_minutes,
+# ── Dependency factory ─────────────────────────────────────────────────────────
+
+def get_auth_service(db: DBConnDep, settings: SettingsDep) -> AuthService:
+    """FastAPI DI: creates AuthService per request."""
+    return AuthService(
+        db=db,
+        token_svc=TokenService(settings),
+        pwd_svc=PasswordService(),
+        settings=settings,
     )
 
-    # 2) refresh (plain -> hash in DB)
-    refresh_plain = create_refresh_token_plain(settings.jwt_refresh_token_bytes)
-    refresh_hash = hash_refresh_token(refresh_plain)
-    exp_at = refresh_expires_at(settings.jwt_refresh_token_expire_days)
 
-    with db.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO app.refresh_tokens (user_id, token_hash, expires_at)
-            VALUES (%s, %s, %s)
-            """,
-            (user.user_id, refresh_hash, exp_at),
-        )
-
-    token_out = TokenOut(
-        access_token=access,
-        expires_in=settings.jwt_access_token_expire_minutes * 60,
-        refresh_expires_in=settings.jwt_refresh_token_expire_days * 24 * 60 * 60,
-    )
-    return token_out, refresh_plain
+AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 
 
-def _set_auth_cookies(response: Response, access_token: str, refresh_token: str, settings):
+# ── Cookie helper (HTTP concern — stays in router) ─────────────────────────────
+
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str, settings) -> None:
     response.set_cookie(
         key="access_token",
         value=access_token,
-        httponly=True,        # Set to True for max security, JS won't read it
+        httponly=True,
         secure=True,
         samesite="lax",
         max_age=settings.jwt_access_token_expire_minutes * 60,
@@ -83,11 +56,13 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str,
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,          # Ensures cookie is only sent over HTTPS
-        samesite="lax",       # Protects against CSRF
+        secure=True,
+        samesite="lax",
         max_age=settings.jwt_refresh_token_expire_days * 24 * 60 * 60,
     )
 
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.post(
     "/register",
@@ -100,36 +75,13 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str,
     },
 )
 def register(
-    body: RegisterRequest, 
-    response: Response, 
-    db: DBConnDep, 
-    settings: SettingsDep
+    body: RegisterRequest,
+    response: Response,
+    auth_svc: AuthServiceDep,
+    settings: SettingsDep,
 ) -> RegisterOut:
-    with db.cursor() as cur:
-        cur.execute("SELECT 1 FROM app.users WHERE email = %s", (body.email,))
-        if cur.fetchone():
-            raise EmailAlreadyExists()
-
-        cur.execute(
-            """
-            INSERT INTO app.users (email, password_hash)
-            VALUES (%s, %s)
-            RETURNING user_id, email, is_active, created_at, last_login
-            """,
-            (body.email, hash_password(body.password)),
-        )
-        row = cur.fetchone()
-
-    user = UserOut(
-        user_id=row[0],
-        email=row[1],
-        is_active=row[2],
-        created_at=row[3],
-        last_login=row[4],
-    )
-    token, refresh_plain = _issue_tokens(user, db, settings)
+    user, token, refresh_plain = auth_svc.register(body.email, body.password)
     _set_auth_cookies(response, token.access_token, refresh_plain, settings)
-    
     return RegisterOut(user=user, token=token)
 
 
@@ -143,48 +95,13 @@ def register(
     },
 )
 def login(
-    body: LoginRequest, 
-    response: Response, 
-    db: DBConnDep, 
-    settings: SettingsDep
+    body: LoginRequest,
+    response: Response,
+    auth_svc: AuthServiceDep,
+    settings: SettingsDep,
 ) -> RegisterOut:
-    with db.cursor() as cur:
-        cur.execute(
-            """
-            SELECT user_id, email, password_hash, is_active, created_at, last_login
-            FROM app.users
-            WHERE email = %s
-            """,
-            (body.email,),
-        )
-        row = cur.fetchone()
-
-    # constant-time-ish verify
-    pw_ok = verify_password(body.password, row[2]) if row else False
-    if not row or not pw_ok:
-        raise InvalidCredentials()
-
-    if not row[3]:
-        raise AccountDisabled()
-
-    with db.cursor() as cur:
-        cur.execute(
-            "UPDATE app.users SET last_login = now() WHERE user_id = %s RETURNING last_login",
-            (row[0],),
-        )
-        updated_login = cur.fetchone()[0]
-
-    user = UserOut(
-        user_id=row[0],
-        email=row[1],
-        is_active=row[3],
-        created_at=row[4],
-        last_login=updated_login,
-    )
-
-    token, refresh_plain = _issue_tokens(user, db, settings)
+    user, token, refresh_plain = auth_svc.login(body.email, body.password)
     _set_auth_cookies(response, token.access_token, refresh_plain, settings)
-    
     return RegisterOut(user=user, token=token)
 
 
@@ -196,80 +113,16 @@ def login(
 )
 def refresh(
     response: Response,
-    db: DBConnDep, 
+    auth_svc: AuthServiceDep,
     settings: SettingsDep,
-    refresh_token: str | None = Cookie(default=None)
+    refresh_token: str | None = Cookie(default=None),
 ) -> TokenOut:
+    from api.auth.exceptions import RefreshTokenInvalid
     if not refresh_token:
         raise RefreshTokenInvalid()
-
-    now = datetime.now(UTC)
-    incoming_hash = hash_refresh_token(refresh_token)
-
-    with db.cursor() as cur:
-        cur.execute(
-            """
-            SELECT refresh_token_id, app.refresh_tokens.user_id, expires_at, revoked_at, app.users.email, app.users.is_active
-            FROM app.refresh_tokens
-            JOIN app.users ON app.users.user_id = app.refresh_tokens.user_id
-            WHERE token_hash = %s
-            """,  # noqa: E501
-            (incoming_hash,),
-        )
-        row = cur.fetchone()
-
-    if not row:
-        raise RefreshTokenInvalid()
-
-    refresh_token_id, user_id, expires_at, revoked_at, email, is_active = row
-
-    if revoked_at is not None:
-        raise RefreshTokenRevoked()
-
-    if expires_at <= now:
-        raise RefreshTokenExpired()
-        
-    if not is_active:
-        raise AccountDisabled()
-
-    # rotation: revoke old + issue new
-    new_refresh_plain = create_refresh_token_plain(settings.jwt_refresh_token_bytes)
-    new_refresh_hash = hash_refresh_token(new_refresh_plain)
-    new_exp_at = refresh_expires_at(settings.jwt_refresh_token_expire_days)
-
-    with db.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE app.refresh_tokens
-            SET revoked_at = now(), replaced_by_hash = %s
-            WHERE refresh_token_id = %s
-            """,
-            (new_refresh_hash, refresh_token_id),
-        )
-        cur.execute(
-            """
-            INSERT INTO app.refresh_tokens (user_id, token_hash, expires_at)
-            VALUES (%s, %s, %s)
-            """,
-            (user_id, new_refresh_hash, new_exp_at),
-        )
-
-    access = create_access_token(
-        user_id=user_id,
-        email=email,
-        is_active=is_active,
-        secret=settings.jwt_secret_key,
-        algorithm=settings.jwt_algorithm,
-        expires_minutes=settings.jwt_access_token_expire_minutes,
-    )
-
-    _set_auth_cookies(response, access, new_refresh_plain, settings)
-
-    return TokenOut(
-        access_token=access,
-        expires_in=settings.jwt_access_token_expire_minutes * 60,
-        refresh_expires_in=settings.jwt_refresh_token_expire_days * 24 * 60 * 60,
-    )
+    token_out, new_refresh_plain = auth_svc.refresh_token(refresh_token)
+    _set_auth_cookies(response, token_out.access_token, new_refresh_plain, settings)
+    return token_out
 
 
 @router.post(
@@ -279,24 +132,10 @@ def refresh(
 )
 def logout(
     response: Response,
-    db: DBConnDep,
-    refresh_token: str | None = Cookie(default=None)
+    auth_svc: AuthServiceDep,
+    refresh_token: str | None = Cookie(default=None),
 ):
-    """
-    Logout user by revoking their refresh token and clearing the cookie
-    """
-    if refresh_token:
-        incoming_hash = hash_refresh_token(refresh_token)
-        with db.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE app.refresh_tokens
-                SET revoked_at = now()
-                WHERE token_hash = %s AND revoked_at IS NULL
-                """,
-                (incoming_hash,),
-            )
-            
+    auth_svc.logout(refresh_token)
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
     return None
@@ -309,97 +148,24 @@ def logout(
     responses={401: {"description": "Missing or invalid access token"}},
 )
 def me(current_user: CurrentUser) -> JWTUser:
-    """
-    Get current user profile statelessly directly from the token payload.
-    """
+    """Get current user profile statelessly from the token payload."""
     return current_user
 
 
-@router.post(
-    "/forgot-password",
-    summary="Request password reset",
-)
+@router.post("/forgot-password", summary="Request password reset")
 def forgot_password(
     body: ForgotPasswordRequest,
-    db: DBConnDep,
+    auth_svc: AuthServiceDep,
     settings: SettingsDep,
 ) -> dict:
-    """
-    Generate a password reset token and save it to the database for the user.
-    """
-    with db.cursor() as cur:
-        cur.execute(
-            "SELECT user_id FROM app.users WHERE email = %s AND is_active = true",
-            (body.email,),
-        )
-        row = cur.fetchone()
-
-    if row:
-        user_id = row[0]
-        reset_plain = secrets.token_urlsafe(32)
-        reset_hash = hashlib.sha256(reset_plain.encode("utf-8")).hexdigest()
-        exp_at = datetime.now(UTC) + timedelta(hours=1)
-
-        with db.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE app.users
-                SET password_reset_token = %s, password_reset_expires_at = %s
-                WHERE user_id = %s
-                """,
-                (reset_hash, exp_at, user_id),
-            )
-        
-        # Dev helper
-        print(f"PASSWORD RESET LINK: http://localhost:3001/reset-password?token={reset_plain}")
-        
-        if settings.app_env in ("dev", "test"):
-            return {
-                "message": "If the email exists, a password reset link has been sent.",
-                "reset_token_dev": reset_plain,
-            }
-
-    return {"message": "If the email exists, a password reset link has been sent."}
+    reset_plain = auth_svc.forgot_password(body.email, settings.app_env)
+    response: dict = {"message": "If the email exists, a password reset link has been sent."}
+    if reset_plain:
+        response["reset_token_dev"] = reset_plain
+    return response
 
 
-@router.post(
-    "/reset-password",
-    summary="Reset password with token",
-)
-def reset_password(
-    body: ResetPasswordRequest,
-    db: DBConnDep,
-) -> dict:
-    """
-    Reset user password using the provided reset token.
-    """
-    token_hash = hashlib.sha256(body.token.encode("utf-8")).hexdigest()
-    now = datetime.now(UTC)
-
-    with db.cursor() as cur:
-        cur.execute(
-            """
-            SELECT user_id FROM app.users
-            WHERE password_reset_token = %s AND password_reset_expires_at > %s AND is_active = true
-            """,
-            (token_hash, now),
-        )
-        row = cur.fetchone()
-
-    if not row:
-        raise InvalidOrExpiredResetToken()
-
-    user_id = row[0]
-    new_hash = hash_password(body.new_password)
-
-    with db.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE app.users
-            SET password_hash = %s, password_reset_token = NULL, password_reset_expires_at = NULL
-            WHERE user_id = %s
-            """,
-            (new_hash, user_id),
-        )
-
+@router.post("/reset-password", summary="Reset password with token")
+def reset_password(body: ResetPasswordRequest, auth_svc: AuthServiceDep) -> dict:
+    auth_svc.reset_password(body.token, body.new_password)
     return {"message": "Password has been reset successfully."}

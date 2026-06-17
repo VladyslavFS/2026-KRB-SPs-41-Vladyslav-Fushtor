@@ -9,14 +9,37 @@ from datetime import datetime, timezone
 import duckdb
 import pandas as pd
 
-from pipeline.enrich.geo import get_country_code
-from pipeline.enrich.risk import calculate_risk_class
+from pipeline.enrich.composite_enricher import CompositeEnricher
+from pipeline.enrich.geo import GeoEnricher
+from pipeline.enrich.risk import RiskClassifier
+from pipeline.protocols.enricher import IEnricher
+from pipeline.protocols.job import BaseJob
 from pipeline.storage.storage import ObjectStorage
 
 
+def _build_default_enricher() -> IEnricher:
+    """Factory: default enrichment pipeline (geo → risk)."""
+    return CompositeEnricher(GeoEnricher(), RiskClassifier())
+
+
 @dataclass(frozen=True)
-class SilverWriteJob:
+class SilverWriteJob(BaseJob):
+    """
+    Parses raw GeoJSON, enriches records (geo + risk), deduplicates,
+    and writes a Silver Parquet file to object storage.
+
+    Pattern:
+      - BaseJob (Template Method) for uniform job interface.
+      - IEnricher / CompositeEnricher (Strategy + Composite) — pluggable enrichment.
+      - ObjectStorage (Strategy) — injectable storage backend.
+    """
     storage: ObjectStorage
+    enricher: IEnricher = None          # None → resolved to default in __post_init__
+
+    def __post_init__(self):
+        # dataclass(frozen=True) requires object.__setattr__ for post-init mutation
+        if self.enricher is None:
+            object.__setattr__(self, "enricher", _build_default_enricher())
 
     def run(
         self,
@@ -31,7 +54,6 @@ class SilverWriteJob:
             window_end = window_end.replace(tzinfo=timezone.utc)
 
         payload = json.loads(raw_geojson.decode())
-
         features = payload.get("features", [])
 
         rows = []
@@ -48,33 +70,21 @@ class SilverWriteJob:
             lat = coords[1] if len(coords) > 1 else None
             depth = coords[2] if len(coords) > 2 else None
 
-
-            country = None
-            if lat is not None and lon is not None:
-                country = get_country_code(float(lat), float(lon))
-
-            mag = props.get("mag")
-            risk_class = calculate_risk_class(
-                mag=float(mag) if mag is not None else None,
-                depth=float(depth) if depth is not None else None
-            )
-
             time_ms = props.get("time")
             updated_ms = props.get("updated")
             if time_ms is None or updated_ms is None:
                 continue
 
-            time_dt = datetime.fromtimestamp(time_ms / 1000, tz=timezone.utc).isoformat()
-            updated_dt = datetime.fromtimestamp(updated_ms / 1000, tz=timezone.utc).isoformat()
+            mag = props.get("mag")
 
-            row = {
+            rows.append({
                 "id": str(event_id),
-                "time": time_dt,
-                "updated": updated_dt,
+                "time": datetime.fromtimestamp(time_ms / 1000, tz=timezone.utc).isoformat(),
+                "updated": datetime.fromtimestamp(updated_ms / 1000, tz=timezone.utc).isoformat(),
                 "latitude": float(lat) if lat is not None else None,
                 "longitude": float(lon) if lon is not None else None,
                 "depth": float(depth) if depth is not None else None,
-                "mag": props.get("mag"),
+                "mag": mag,
                 "mag_type": props.get("magType"),
                 "place": props.get("place"),
                 "event_type": props.get("type"),
@@ -83,49 +93,39 @@ class SilverWriteJob:
                 "url": props.get("url"),
                 "detail": props.get("detail"),
                 "tsunami": props.get("tsunami"),
-                "country": country,
-                "risk_class": risk_class,
-                # Extended stats
-                "alert": props.get("alert"),  # green, yellow, orange, red
-                "sig": int(props.get("sig")) if props.get("sig") is not None else None,
-                "felt": int(props.get("felt")) if props.get("felt") is not None else None,
-                "mmi": float(props.get("mmi")) if props.get("mmi") is not None else None,
-                "nst": int(props.get("nst")) if props.get("nst") is not None else None, # Number of stations
-                "gap": float(props.get("gap")) if props.get("gap") is not None else None, # Azimuthal gap
-                "mag_error": float(props.get("magError")) if props.get("magError") is not None else None,
-                # Window
+                "alert": props.get("alert"),
+                "sig": int(props["sig"]) if props.get("sig") is not None else None,
+                "felt": int(props["felt"]) if props.get("felt") is not None else None,
+                "mmi": float(props["mmi"]) if props.get("mmi") is not None else None,
+                "nst": int(props["nst"]) if props.get("nst") is not None else None,
+                "gap": float(props["gap"]) if props.get("gap") is not None else None,
+                "mag_error": float(props["magError"]) if props.get("magError") is not None else None,
                 "source_window_start": window_start,
                 "source_window_end": window_end,
-            }
-            rows.append(row)
-        
-        # Handle empty case to preserve schema if possible, or just create empty df
-        if not rows:
-             df = pd.DataFrame(columns=[
-                 "id", "time", "updated", "latitude", "longitude", "depth", "mag", "mag_type",
-                 "place", "event_type", "status", "net", "url", "detail", "tsunami", "country",
-                 "risk_class", "alert", "sig", "felt", "mmi", "nst", "gap", "mag_error",
-                 "source_window_start", "source_window_end"
-             ])
-        else:
-             df = pd.DataFrame(rows)
+            })
 
+        schema_cols = [
+            "id", "time", "updated", "latitude", "longitude", "depth", "mag", "mag_type",
+            "place", "event_type", "status", "net", "url", "detail", "tsunami",
+            "alert", "sig", "felt", "mmi", "nst", "gap", "mag_error",
+            "source_window_start", "source_window_end",
+        ]
+        df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=schema_cols)
+
+        # ── Enrichment (Composite: GeoEnricher → RiskClassifier) ──────────────
+        if not df.empty:
+            df = self.enricher.enrich(df)
+
+        # ── Deduplication via DuckDB ───────────────────────────────────────────
         with duckdb.connect() as conn:
             conn.register("rows", df)
-
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE OR REPLACE TABLE silver AS
-                SELECT *
-                FROM (
-                    SELECT
-                        *,
-                        row_number() OVER (PARTITION BY id ORDER BY updated DESC) as rn
+                SELECT * FROM (
+                    SELECT *, row_number() OVER (PARTITION BY id ORDER BY updated DESC) as rn
                     FROM rows
-                )
-                WHERE rn = 1;
-                """
-            )
+                ) WHERE rn = 1;
+            """)
 
             date = window_start.date().isoformat()
             hour = f"{window_start.hour:02d}"
@@ -138,7 +138,13 @@ class SilverWriteJob:
             with tempfile.TemporaryDirectory() as tmpdir:
                 local_path = os.path.join(tmpdir, "silver.parquet")
                 conn.execute(f"COPY silver TO '{local_path}' (FORMAT 'parquet');")
-                self.storage.upload_file(local_path=local_path, key=silver_key, content_type="application/octet-stream")
-
+                self.storage.upload_file(
+                    local_path=local_path,
+                    key=silver_key,
+                    content_type="application/octet-stream",
+                )
 
         return silver_key
+
+    def _execute(self, **kwargs):
+        return self.run(**kwargs)

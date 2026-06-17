@@ -3,33 +3,36 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from pipeline.clients.usgs_client import USGSClient
+from pipeline.protocols.job import BaseJob
+from pipeline.protocols.seismic_source import ISeismicDataSource
 from pipeline.config.settings import Settings
 from pipeline.storage.storage import ObjectStorage
 
 
 @dataclass
-class BronzeIngestJob:
+class BronzeIngestJob(BaseJob):
+    """
+    Fetches raw GeoJSON from a seismic data source and stores it as a raw object.
+
+    Pattern:
+      - BaseJob (Template Method) for uniform job interface.
+      - ISeismicDataSource (Strategy) — injectable client (USGS or mock).
+      - ObjectStorage (Strategy) — injectable storage backend.
+    """
     settings: Settings
     storage: ObjectStorage
-    client: USGSClient
+    client: ISeismicDataSource          # ← was hardcoded USGSClient
 
     def run(self, *, window_start: datetime, window_end: datetime) -> str:
-        """
-        Fetches GeoJSON from USGS and stores it as raw object.
-        Returns storage key.
-        """
+        """Fetches GeoJSON and stores it. Returns storage key."""
         if window_start.tzinfo is None:
             window_start = window_start.replace(tzinfo=timezone.utc)
         if window_end.tzinfo is None:
             window_end = window_end.replace(tzinfo=timezone.utc)
 
-        start_s = window_start.isoformat()
-        end_s = window_end.isoformat()
-
         raw_bytes = self.client.fetch_geojson(
-            starttime=start_s,
-            endtime=end_s
+            starttime=window_start.isoformat(),
+            endtime=window_end.isoformat(),
         )
 
         key = (
@@ -43,6 +46,9 @@ class BronzeIngestJob:
         self.storage.put_bytes(
             key=key,
             data=raw_bytes,
-            content_type="application/geo+json"
+            content_type="application/geo+json",
         )
         return key
+
+    def _execute(self, **kwargs):
+        return self.run(**kwargs)

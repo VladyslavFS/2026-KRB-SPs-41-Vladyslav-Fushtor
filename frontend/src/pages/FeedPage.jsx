@@ -10,6 +10,7 @@ export default function FeedPage() {
   const [events, setEvents] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Filters
   const [hours, setHours] = useState(24);
@@ -18,14 +19,31 @@ export default function FeedPage() {
   const [limit, setLimit] = useState(200);
 
   useEffect(() => {
+    // AbortController cancels in-flight requests when filters change quickly.
+    // This prevents stale responses from overwriting fresher data (race condition fix).
+    const controller = new AbortController();
+
     setLoading(true);
-    apiGetEvents({ hours, mag_min: magMin, severity, limit }).then((res) => {
+    setError(null);
+
+    apiGetEvents({ hours, mag_min: magMin, severity, limit }, controller.signal).then((res) => {
+      // res === null means the request was intentionally aborted — do nothing
+      if (res === null) return;
+
+      if (res.status === 429) {
+        setError("Too many requests — slow down a bit and try again.");
+        setLoading(false);
+        return;
+      }
       if (res?.ok) {
         setEvents(res.data.items || []);
         setTotal(res.data.total || 0);
       }
       setLoading(false);
     });
+
+    // Cleanup: abort the previous in-flight request when the effect re-runs
+    return () => controller.abort();
   }, [hours, magMin, severity, limit]);
 
   // Computed stats
@@ -129,6 +147,13 @@ export default function FeedPage() {
         />
         <KpiCard label="High severity" value={highCount} variant={highCount > 0 ? "danger" : undefined} />
       </div>
+
+      {/* Error banner (rate limit or other API errors) */}
+      {error && (
+        <div className="card" style={{ borderColor: "var(--danger)", color: "var(--danger)", padding: "12px 16px" }}>
+          ⚠️ {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="spinner"></div>

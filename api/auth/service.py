@@ -1,34 +1,24 @@
 """
-Pure auth helpers — no FastAPI deps here.
+Pure auth helpers — kept for backward compatibility.
+New code should use PasswordService and TokenService directly.
 """
 from __future__ import annotations
 
-import hashlib
-import secrets
 from datetime import UTC, datetime, timedelta
 
-import bcrypt
-from jose import JWTError, jwt
+from api.auth.password_service import PasswordService
+from api.auth.token_service import TokenService
+
+# ── Module-level singletons for legacy call sites ──────────────────────────────
+_pwd = PasswordService()
 
 
 def hash_password(password: str) -> str:
-    # bcrypt 4.0+ enforces 72 bytes limit. Be safe.
-    pwd_bytes = password.encode("utf-8")
-    if len(pwd_bytes) > 72:
-        pwd_bytes = pwd_bytes[:72]
-    
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
+    return _pwd.hash(password)
+
 
 def verify_password(plain: str, hashed: str) -> bool:
-    pwd_bytes = plain.encode("utf-8")
-    if len(pwd_bytes) > 72:
-        pwd_bytes = pwd_bytes[:72]
-        
-    try:
-        return bcrypt.checkpw(pwd_bytes, hashed.encode("utf-8"))
-    except ValueError:
-        return False
+    return _pwd.verify(plain, hashed)
 
 
 def create_access_token(
@@ -39,38 +29,38 @@ def create_access_token(
     algorithm: str,
     expires_minutes: int,
 ) -> str:
-    now = datetime.now(UTC)
-    expire = now + timedelta(minutes=expires_minutes)
-    payload = {
-        "sub": str(user_id),
-        "email": email,
-        "is_active": is_active,
-        "type": "access",
-        "iss": "pp_earthquake",
-        "iat": int(now.timestamp()),
-        "jti": secrets.token_hex(16),  # Unique identifier for the token
-        "exp": expire,
-    }
-    return jwt.encode(payload, secret, algorithm=algorithm)
+    """Legacy signature wrapper — use TokenService.create_access_token() in new code."""
+    from api.config import Settings
+    # Build a minimal settings-compatible object for TokenService
+    class _MinSettings:
+        jwt_secret_key = secret
+        jwt_algorithm = algorithm
+        jwt_access_token_expire_minutes = expires_minutes
+        jwt_refresh_token_bytes = 32
+        jwt_refresh_token_expire_days = 30
+
+    return TokenService(_MinSettings()).create_access_token(user_id, email, is_active)  # type: ignore[arg-type]
 
 
 def decode_access_token(token: str, secret: str, algorithm: str) -> dict:
-    payload = jwt.decode(token, secret, algorithms=[algorithm])
-    
-    if payload.get("type") != "access":
-        raise JWTError("Invalid token type")
-        
-    sub = payload.get("sub")
-    if sub is None:
-        raise JWTError("Missing sub claim")
-    return payload
+    """Legacy signature wrapper — use TokenService.decode_access_token() in new code."""
+    class _MinSettings:
+        jwt_secret_key = secret
+        jwt_algorithm = algorithm
+        jwt_access_token_expire_minutes = 15
+        jwt_refresh_token_bytes = 32
+        jwt_refresh_token_expire_days = 30
+
+    return TokenService(_MinSettings()).decode_access_token(token)  # type: ignore[arg-type]
 
 
 def create_refresh_token_plain(nbytes: int) -> str:
+    import secrets
     return secrets.token_urlsafe(nbytes)
 
 
 def hash_refresh_token(token_plain: str) -> str:
+    import hashlib
     return hashlib.sha256(token_plain.encode("utf-8")).hexdigest()
 
 
